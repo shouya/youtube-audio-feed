@@ -1,12 +1,12 @@
 use std::io::Cursor;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use atom_syndication::{Entry, Feed};
 use axum::{
   body::{self, Bytes, HttpBody},
   extract::Path,
-  http::status::StatusCode,
+  http::{status::StatusCode, Uri},
   response::{IntoResponse, Response},
   routing::get,
   Router,
@@ -20,7 +20,9 @@ use rss::{
   Channel, EnclosureBuilder,
 };
 
+const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.foobar.com";
 const GENERATOR_STR: &str = "youtube_audio_feed";
+const INVIDIOUS_INSTANCE: &str = "https://invidious.namazso.eu";
 
 enum Error {
   Server(anyhow::Error),
@@ -92,7 +94,7 @@ async fn get_audio(
   let download = reqwest::Client::builder()
     .redirect(Policy::none())
     .build()?
-    .post("https://invidious.namazso.eu/download")
+    .post(format!("{INVIDIOUS_INSTANCE}/download"))
     .form(&[
       ("id", video_id.as_str()),
       ("title", "foobar"),
@@ -113,7 +115,7 @@ async fn get_audio(
       .header(header::CONTENT_TYPE, "application/rss+xml; charset=UTF-8")
       .header(
         header::LOCATION,
-        format!("{}{}", "https://invidious.namazso.eu", target_path),
+        format!("{INVIDIOUS_INSTANCE}{target_path}"),
       )
       .body(body::Empty::new().boxed())?;
 
@@ -195,7 +197,7 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
     .cloned()
     .map(|x| x.href)
     .with_context(|| "video url not found")?;
-  let audio_url = translate_video_to_audio_url(video_url.as_ref());
+  let audio_url = translate_video_to_audio_url(video_url.as_ref())?;
 
   let description_html = format!(
     "<img loading=\"lazy\" class=\"size-thumbnail\"\
@@ -238,6 +240,12 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
   Ok(item)
 }
 
-fn translate_video_to_audio_url(url: &str) -> String {
-  url.into()
+fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
+  let uri: Uri = uri_str.parse()?;
+  let video_id = match uri.query() {
+    Some(query) if query.starts_with("v=") => query.strip_prefix("v=").unwrap(),
+    Some(_) | None => bail!("Invalid video url"),
+  };
+
+  Ok(format!("{INSTANCE_PUBLIC_URL}/audio/{video_id}"))
 }
