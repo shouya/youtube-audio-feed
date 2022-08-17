@@ -11,7 +11,8 @@ use axum::{
   routing::get,
   Router,
 };
-use reqwest::redirect::Policy;
+
+use reqwest::{header, redirect::Policy};
 use rss::{
   extension::itunes::{
     ITunesChannelExtensionBuilder, ITunesItemExtensionBuilder,
@@ -51,8 +52,6 @@ where
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-  console_subscriber::init();
-
   let app = Router::new()
     .route("/channel/:channel_id", get(channel_podcast_xml))
     .route("/audio/:video_id", get(get_audio));
@@ -90,24 +89,32 @@ async fn channel_podcast_xml(
 async fn get_audio(
   Path(video_id): Path<String>,
 ) -> Result<impl IntoResponse, Error> {
-  let download = dbg!(reqwest::Client::builder()
+  let download = reqwest::Client::builder()
     .redirect(Policy::none())
     .build()?
     .post("https://invidious.namazso.eu/download")
     .form(&[
       ("id", video_id.as_str()),
       ("title", "foobar"),
-      ("dowload_widget", "{\"itag\":140,\"ext\":\"mp4\"}"),
-    ]))
-
+      ("download_widget", "{\"itag\":140,\"ext\":\"mp4\"}"),
+    ])
     .send()
     .await?;
 
   if download.status().is_redirection() {
+    let target_path = download
+      .headers()
+      .get(header::LOCATION)
+      .with_context(|| "Target location not found")?
+      .to_str()?;
+
     let resp = Response::builder()
       .status(301)
-      .header("Content-Type", "application/rss+xml; charset=UTF-8")
-      .header("Location", "/foo")
+      .header(header::CONTENT_TYPE, "application/rss+xml; charset=UTF-8")
+      .header(
+        header::LOCATION,
+        format!("{}{}", "https://invidious.namazso.eu", target_path),
+      )
       .body(body::Empty::new().boxed())?;
 
     return Ok(resp);
@@ -116,7 +123,7 @@ async fn get_audio(
   let resp = Response::builder()
     .status(500)
     .header("Content-Type", "application/rss+xml; charset=UTF-8")
-    .body(format!("{:?}", download).boxed())?;
+    .body(format!("{:#?}", download).boxed())?;
 
   Ok(resp)
 }
@@ -165,13 +172,6 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
     .first()
     .with_context(|| "unreachable")?
     .children;
-
-  let media_content = &media_group
-    .get("content")
-    .with_context(|| "no media:content found")?
-    .first()
-    .with_context(|| "unreachable")?
-    .attrs;
 
   let media_description = &media_group
     .get("description")
