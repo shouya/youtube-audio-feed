@@ -121,9 +121,9 @@ async fn get_audio(
   }
 
   let resp = Response::builder()
-    .status(500)
-    .header("Content-Type", "application/rss+xml; charset=UTF-8")
-    .body(format!("{:#?}", download).boxed())?;
+    .status(download.status())
+    .header(header::CONTENT_TYPE, "application/rss+xml; charset=UTF-8")
+    .body(download.text().await?.boxed())?;
 
   Ok(resp)
 }
