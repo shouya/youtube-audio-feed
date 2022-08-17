@@ -10,6 +10,6 @@ anyhow = "1.0.61"
 atom_syndication = "0.11.0"
 axum = { version = "0.5.15", features = ["macros"] }
 http-types = "2.12.0"
-reqwest = "0.11.11"
+reqwest = { version = "0.11.11", default_features = false, features = ["rustls-tls"] }
 rss = "2.0.1"
 tokio = { version = "1.20.1", features = ["macros"] }
