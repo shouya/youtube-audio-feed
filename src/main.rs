@@ -1,35 +1,71 @@
-use std::io::{BufReader, Cursor};
+use std::io::Cursor;
 
 use anyhow::{Context, Result};
 
 use atom_syndication::{Entry, Feed};
+use axum::{
+  body::{self, Bytes, HttpBody},
+  extract::Path,
+  http::status::StatusCode,
+  response::{IntoResponse, Response},
+  routing::get,
+  Router,
+};
+use reqwest::redirect::Policy;
 use rss::{
   extension::itunes::{
     ITunesChannelExtensionBuilder, ITunesItemExtensionBuilder,
   },
   Channel, EnclosureBuilder,
 };
-use tide::{Request, Response};
 
 const GENERATOR_STR: &str = "youtube_audio_feed";
 
-#[async_std::main]
-async fn main() -> tide::Result<()> {
-  tide::log::start();
-
-  let mut app = tide::new();
-
-  app.at("/channel/:channel_id").get(channel_podcast_xml);
-  app.at("/audio/:video_id").get(get_audio);
-  app.with(tide::log::LogMiddleware::new());
-
-  app.listen("127.0.0.1:8080").await?;
-
-  Ok(())
+enum Error {
+  Server(anyhow::Error),
+  #[allow(unused)]
+  Client(anyhow::Error),
 }
 
-async fn channel_podcast_xml(req: Request<()>) -> tide::Result {
-  let channel_id = req.param("channel_id")?;
+impl IntoResponse for Error {
+  fn into_response(self) -> Response {
+    match self {
+      Error::Server(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
+      }
+      Error::Client(err) => {
+        (StatusCode::BAD_REQUEST, err.to_string()).into_response()
+      }
+    }
+  }
+}
+
+impl<E> From<E> for Error
+where
+  E: Into<anyhow::Error>,
+{
+  fn from(err: E) -> Self {
+    Error::Server(err.into())
+  }
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+  console_subscriber::init();
+
+  let app = Router::new()
+    .route("/channel/:channel_id", get(channel_podcast_xml))
+    .route("/audio/:video_id", get(get_audio));
+
+  axum::Server::bind(&"127.0.0.1:8080".parse().unwrap())
+    .serve(app.into_make_service())
+    .await
+    .map_err(|e| e.into())
+}
+
+async fn channel_podcast_xml(
+  Path(channel_id): Path<String>,
+) -> Result<impl IntoResponse, Error> {
   let feed = reqwest::get(format!(
     "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
   ))
@@ -42,11 +78,47 @@ async fn channel_podcast_xml(req: Request<()>) -> tide::Result {
   let mut output = Vec::new();
   podcast_channel.pretty_write_to(&mut output, b' ', 2)?;
 
-  let resp = Response::builder(200)
+  let resp = Response::builder()
+    .status(StatusCode::INTERNAL_SERVER_ERROR)
     .header("Content-Type", "application/rss+xml; charset=UTF-8")
-    .body(output);
+    .body(body::Full::new(Bytes::from(output)))?;
 
-  Ok(resp.build())
+  Ok(resp)
+}
+
+#[axum::debug_handler]
+async fn get_audio(
+  Path(video_id): Path<String>,
+) -> Result<impl IntoResponse, Error> {
+  let download = dbg!(reqwest::Client::builder()
+    .redirect(Policy::none())
+    .build()?
+    .post("https://invidious.namazso.eu/download")
+    .form(&[
+      ("id", video_id.as_str()),
+      ("title", "foobar"),
+      ("dowload_widget", "{\"itag\":140,\"ext\":\"mp4\"}"),
+    ]))
+
+    .send()
+    .await?;
+
+  if download.status().is_redirection() {
+    let resp = Response::builder()
+      .status(301)
+      .header("Content-Type", "application/rss+xml; charset=UTF-8")
+      .header("Location", "/foo")
+      .body(body::Empty::new().boxed())?;
+
+    return Ok(resp);
+  }
+
+  let resp = Response::builder()
+    .status(500)
+    .header("Content-Type", "application/rss+xml; charset=UTF-8")
+    .body(format!("{:?}", download).boxed())?;
+
+  Ok(resp)
 }
 
 fn map_feed(feed: Feed) -> anyhow::Result<Channel> {
@@ -168,32 +240,4 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
 
 fn translate_video_to_audio_url(url: &str) -> String {
   url.into()
-}
-
-async fn get_audio(req: Request<()>) -> tide::Result {
-  let video_id = req.param("video_id")?;
-
-  let download = reqwest::Client::new()
-    .post("https://invidious.namazso.eu/download")
-    .form(&[
-      ("id", video_id),
-      ("title", "unknown"),
-      ("dowload_widget", "{\"itag\":140,\"ext\":\"mp4\"}"),
-    ])
-    .send()
-    .await?;
-
-  if download.status().is_redirection() {
-    let resp = Response::builder(download.status().as_u16())
-      .header("Content-Type", "application/rss+xml; charset=UTF-8")
-      .header("Location", "/foo")
-      .build();
-
-    return Ok(resp);
-  }
-
-  let resp = Response::builder(500)
-    .header("Content-Type", "application/rss+xml; charset=UTF-8")
-    .build();
-  Ok(resp)
 }
