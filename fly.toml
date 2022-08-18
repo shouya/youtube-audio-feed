@@ -36,3 +36,6 @@ processes = []
     interval = "15s"
     restart_limit = 0
     timeout = "2s"
+
+[build]
+  image = "registry.fly.io/youtube-audio-feed:latest"

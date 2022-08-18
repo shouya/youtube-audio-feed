@@ -12,7 +12,7 @@ mod feed;
 pub use error::Error;
 
 pub const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.fly.dev";
-pub const GENERATOR_STR: &str = "youtube_audio_feed";
+pub const GENERATOR_STR: &str = "https://github.com/youtube_audio_feed";
 pub const INVIDIOUS_INSTANCE: &str = "https://invidious.namazso.eu";
 
 #[tokio::main(flavor = "current_thread")]
