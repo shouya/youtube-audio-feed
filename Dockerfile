@@ -6,14 +6,18 @@ COPY . /workdir
 WORKDIR /workdir
 
 RUN --mount=type=cache,target=/workdir/target \
-    --mount=type=cache,target=/root/.cargo \
-    cargo build --release --target=x86_64-unknown-linux-musl
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo build --release --target=x86_64-unknown-linux-musl && \
+    cp /workdir/target/x86_64-unknown-linux-musl/release/youtube_audio_feed \
+       /workdir
+
+
 # RUN cargo build --release --target=x86_64-unknown-linux-musl
 
 FROM docker.io/library/alpine:latest AS RUNNER
 
 COPY --from=BUILDER \
-    /workdir/target/x86_64-unknown-linux-musl/release/youtube_audio_feed \
+    /workdir/youtube_audio_feed \
     /usr/bin/youtube_audio_feed
 
 EXPOSE 8080
