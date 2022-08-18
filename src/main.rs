@@ -1,12 +1,12 @@
 use std::io::Cursor;
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 
 use atom_syndication::{Entry, Feed};
 use axum::{
   body::{self, Bytes, HttpBody},
   extract::Path,
-  http::{status::StatusCode, Uri},
+  http::status::StatusCode,
   response::{IntoResponse, Response},
   routing::get,
   Router,
@@ -16,7 +16,7 @@ use http_types::Url;
 use reqwest::{header, redirect::Policy};
 use rss::{
   extension::itunes::{
-    ITunesChannelExtensionBuilder, ITunesItemExtensionBuilder,
+    ITunesCategory, ITunesChannelExtensionBuilder, ITunesItemExtensionBuilder,
   },
   Channel, EnclosureBuilder,
 };
@@ -78,15 +78,10 @@ async fn health() -> impl IntoResponse {
 async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
 ) -> Result<impl IntoResponse, Error> {
-  let feed = reqwest::get(format!(
-    "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-  ))
-  .await?;
+  let (feed, extra_info) =
+    tokio::try_join!(get_feed(&channel_id), get_extra_info(&channel_id))?;
 
-  let body = feed.text().await?;
-  let youtube_feed = Feed::read_from(Cursor::new(body))?;
-
-  let podcast_channel = map_feed(youtube_feed)?;
+  let podcast_channel = convert_feed(feed, extra_info)?;
   let mut output = Vec::new();
   podcast_channel.pretty_write_to(&mut output, b' ', 2)?;
 
@@ -141,7 +136,7 @@ async fn get_audio(
   Ok(resp)
 }
 
-fn map_feed(feed: Feed) -> anyhow::Result<Channel> {
+fn convert_feed(feed: Feed, extra: ExtraInfo) -> anyhow::Result<Channel> {
   let mut channel = Channel::default();
 
   channel.set_title(&*feed.title);
@@ -153,14 +148,26 @@ fn map_feed(feed: Feed) -> anyhow::Result<Channel> {
 
   let mut itunes = ITunesChannelExtensionBuilder::default();
 
-  itunes.author(Some(
-    feed
-      .authors
-      .iter()
-      .map(|x| x.name.as_ref())
-      .collect::<Vec<_>>()
-      .join(", "),
-  ));
+  itunes
+    .author(Some(
+      feed
+        .authors
+        .iter()
+        .map(|x| x.name.as_ref())
+        .collect::<Vec<_>>()
+        .join(", "),
+    ))
+    .image(Some(extra.logo_url))
+    .categories(
+      extra
+        .tags
+        .into_iter()
+        .map(|tag| ITunesCategory {
+          text: tag,
+          subcategory: None,
+        })
+        .collect::<Vec<_>>(),
+    );
 
   channel.set_itunes_ext(itunes.build());
 
@@ -261,14 +268,32 @@ fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
   Ok(format!("{INSTANCE_PUBLIC_URL}/audio/{video_id}"))
 }
 
-async fn get_logo(channel_id: String) -> Result<String> {
-  let resp =
-    reqwest::get("https://www.youtube.com/channel/{channel_id}").await?;
+async fn get_feed(channel_id: &str) -> Result<Feed> {
+  let feed = reqwest::get(format!(
+    "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+  ))
+  .await?;
+
+  let body = feed.text().await?;
+  Ok(Feed::read_from(Cursor::new(body))?)
+}
+
+async fn get_extra_info(channel_id: &str) -> Result<ExtraInfo> {
+  let url = format!("https://www.youtube.com/channel/{channel_id}");
+  let resp = reqwest::get(url).await?;
 
   ensure!(resp.status().is_success(), "Failed to channel page");
 
   let resp_body = resp.text().await?;
   let dom = tl::parse(&resp_body, tl::ParserOptions::default())?;
+
+  let logo_url = get_logo(&dom)?;
+  let tags = get_tags(&dom)?;
+
+  Ok(ExtraInfo { logo_url, tags })
+}
+
+fn get_logo(dom: &tl::VDom<'_>) -> Result<String> {
   let thumbnail_node = dom
     .query_selector("link[rel=\"image_src\",href]")
     .expect("selector is hard-coded, thus must be valid")
@@ -283,8 +308,38 @@ async fn get_logo(channel_id: String) -> Result<String> {
     .attributes()
     .get("href")
     .expect("href must exists")
-    .with_context(|| "thumbnail href empty")?
+    .with_context(|| "link[href] empty")?
     .as_utf8_str();
 
   Ok(thumbnail_url.to_string())
+}
+
+fn get_tags(dom: &tl::VDom<'_>) -> Result<Vec<String>> {
+  let mut tags = Vec::new();
+  let node_iter = dom
+    .query_selector("meta[property=\"og:video:tag\",content]")
+    .expect("selector should be valid");
+
+  for node in node_iter {
+    let tag = node
+      .get(dom.parser())
+      .expect("queried node must be within dom")
+      .as_tag()
+      .with_context(|| "meta is not a tag as expected")?
+      .attributes()
+      .get("content")
+      .expect("content must exists")
+      .with_context(|| "meta[content] empty")?
+      .as_utf8_str()
+      .into_owned();
+
+    tags.push(tag);
+  }
+
+  Ok(tags)
+}
+
+struct ExtraInfo {
+  logo_url: String,
+  tags: Vec<String>,
 }
