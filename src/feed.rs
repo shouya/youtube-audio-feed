@@ -5,8 +5,9 @@ use atom_syndication::{Entry, Feed};
 use axum::{
   body::{self, Bytes},
   extract::{Path, Query},
+  headers::ContentType,
   http::Response,
-  response::IntoResponse,
+  response::IntoResponse, TypedHeader,
 };
 use http_types::Url;
 use once_cell::sync::Lazy;
@@ -267,13 +268,12 @@ pub async fn channel_podcast_url(
 ) -> Result<impl IntoResponse, Error> {
   let channel_id = match extract_youtube_channel_name(&req.url)? {
     ChannelIdentifier::Id(id) => id,
-    ChannelIdentifier::Name(name) => {
-      find_youtube_channel_id(&name).await?
-    }
+    ChannelIdentifier::Name(name) => find_youtube_channel_id(&name).await?,
   };
   let podcast_url = format!("{INSTANCE_PUBLIC_URL}/channel/{channel_id}");
+  let content_type = TypedHeader(ContentType::text());
 
-  Ok(podcast_url)
+  Ok((content_type, podcast_url))
 }
 
 async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
@@ -318,7 +318,9 @@ fn extract_youtube_channel_name(url: &str) -> Result<ChannelIdentifier> {
   let url: Url = url.parse()?;
 
   ensure!(
-    matches!(url.host_str(), Some("www.youtube.com")),
+    matches!(url.host_str(), Some("www.youtube.com")) ||
+      matches!(url.host_str(), Some("m.youtube.com"))
+      ,
     "Invalid youtube host {url}"
   );
 
