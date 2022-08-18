@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Youtube to Podcast!</title>
+  </head>
+  <body>
+    <p>This service converts any Youtube channel into audio-only podcast RSS.</p>
+    <hr />
+
+    <center>
+      <form method="get" action="/get-podcast">
+        Input url: <input name="url" size="100" placeholder="https://www.youtube.com/c/SciShow"> <br/>
+        <input type="submit" value="Convert!">
+      </form>
+    </center>
+
+    <hr />
+    <p>
+      Links:
+      <ul>
+        <li>
+          <a href="https://invidious.io" title="The backend service powering audio extracting so I don't have to do it on my own">
+            Invidious
+          </a>
+        </li>
+        <li>
+          <a href="https://invidious.namazso.eu" title="A public invidious instance used by this service">
+            namazso.eu
+          </a>
+        </li>
+        <li>
+          <a href="https://git.lain.li/shouya/youtube-audio-feed">Source code</a>
+        </li>
+      </ul>
+    </p>
+  </body>
+</html>

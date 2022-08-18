@@ -1,6 +1,9 @@
 use anyhow::Result;
 
-use axum::{routing::get, Router, response::IntoResponse};
+use axum::{
+  headers::ContentType, response::IntoResponse, routing::get, Router,
+  TypedHeader,
+};
 
 mod audio;
 mod error;
@@ -27,8 +30,13 @@ async fn main() -> Result<()> {
     .map_err(|e| e.into())
 }
 
+pub const HOMEPAGE_HTML: &str = include_str!("../html/homepage.html");
+
 async fn homepage() -> impl IntoResponse {
-  "Hello!".to_owned()
+  (
+    TypedHeader::<ContentType>(ContentType::html()),
+    HOMEPAGE_HTML,
+  )
 }
 
 async fn health() -> impl IntoResponse {

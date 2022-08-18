@@ -185,7 +185,7 @@ async fn get_extra_info(channel_id: &str) -> Result<ExtraInfo> {
   let url = format!("https://www.youtube.com/channel/{channel_id}");
   let resp = reqwest::get(url).await?;
 
-  ensure!(resp.status().is_success(), "Failed to channel page");
+  ensure!(resp.status().is_success(), "Failed to get channel page");
 
   let resp_body = resp.text().await?;
   let dom = tl::parse(&resp_body, tl::ParserOptions::default())?;
@@ -273,10 +273,10 @@ pub async fn channel_podcast_url(
 }
 
 async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
-  let url = format!("https://www.youtube.com/channel/{channel_name}");
+  let url = format!("https://www.youtube.com/c/{channel_name}");
   let resp = reqwest::get(url).await?;
 
-  ensure!(resp.status().is_success(), "Failed to channel page");
+  ensure!(resp.status().is_success(), "Failed to get channel page");
 
   let resp_body = resp.text().await?;
   let dom = tl::parse(&resp_body, tl::ParserOptions::default())?;
@@ -310,13 +310,13 @@ fn extract_youtube_channel_name(url: &str) -> Result<String> {
 
   ensure!(
     matches!(url.host_str(), Some("www.youtube.com")),
-    "Invalid youtube url {url}"
+    "Invalid youtube host {url}"
   );
 
   if let Some(segments) = url.path_segments() {
     let segs: Vec<_> = segments.take(3).collect();
-    if segs.len() <= 2 {
-      bail!("Invalid youtube url {url}");
+    if segs.len() < 2 {
+      bail!("Invalid path {url}");
     }
 
     if ["c", "channel"].contains(&segs[0]) {
