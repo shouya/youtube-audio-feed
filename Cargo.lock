@@ -1587,6 +1587,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
+name = "tl"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93b9095db6e27d516825dd9a15842de93e8ef1dd70970ed08573a7db45f16a70"
+
+[[package]]
 name = "tokio"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2002,5 +2008,6 @@ dependencies = [
  "http-types",
  "reqwest",
  "rss",
+ "tl",
  "tokio",
 ]

@@ -12,4 +12,7 @@ axum = { version = "0.5.15", features = ["macros"] }
 http-types = "2.12.0"
 reqwest = { version = "0.11.11", default_features = false, features = ["rustls-tls"] }
 rss = "2.0.1"
+# simd requires rustc nightly
+# tl = { version = "0.7.6", features = ["simd"] }
+tl = { version = "0.7.6" }
 tokio = { version = "1.20.1", features = ["macros"] }

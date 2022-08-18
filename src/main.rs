@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 
 use atom_syndication::{Entry, Feed};
 use axum::{
@@ -12,6 +12,7 @@ use axum::{
   Router,
 };
 
+use http_types::Url;
 use reqwest::{header, redirect::Policy};
 use rss::{
   extension::itunes::{
@@ -71,7 +72,7 @@ async fn homepage() -> impl IntoResponse {
 }
 
 async fn health() -> impl IntoResponse {
-  "ok!".to_owned()
+  "ok".to_owned()
 }
 
 async fn channel_podcast_xml(
@@ -251,11 +252,39 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
 }
 
 fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
-  let uri: Uri = uri_str.parse()?;
-  let video_id = match uri.query() {
-    Some(query) if query.starts_with("v=") => query.strip_prefix("v=").unwrap(),
-    Some(_) | None => bail!("Invalid video url"),
-  };
+  let uri: Url = uri_str.parse()?;
+  let video_id = uri
+    .query_pairs()
+    .find_map(|(k, v)| (k == "v").then_some(v))
+    .with_context(|| "Invalid video url")?;
 
   Ok(format!("{INSTANCE_PUBLIC_URL}/audio/{video_id}"))
+}
+
+async fn get_logo(channel_id: String) -> Result<String> {
+  let resp =
+    reqwest::get("https://www.youtube.com/channel/{channel_id}").await?;
+
+  ensure!(resp.status().is_success(), "Failed to channel page");
+
+  let resp_body = resp.text().await?;
+  let dom = tl::parse(&resp_body, tl::ParserOptions::default())?;
+  let thumbnail_node = dom
+    .query_selector("link[rel=\"image_src\",href]")
+    .expect("selector is hard-coded, thus must be valid")
+    .next()
+    .with_context(|| "Thumbnail not found")?;
+
+  let thumbnail_url = thumbnail_node
+    .get(dom.parser())
+    .expect("queried node must be within dom")
+    .as_tag()
+    .with_context(|| "link is not a tag as expected")?
+    .attributes()
+    .get("href")
+    .expect("href must exists")
+    .with_context(|| "thumbnail href empty")?
+    .as_utf8_str();
+
+  Ok(thumbnail_url.to_string())
 }
