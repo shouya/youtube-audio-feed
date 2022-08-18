@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{ensure, Context, Result};
 use atom_syndication::{Entry, Feed};
 use axum::{
   body::{self, Bytes},
@@ -9,6 +9,8 @@ use axum::{
   response::IntoResponse,
 };
 use http_types::Url;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use reqwest::{header, StatusCode};
 use rss::{
   extension::itunes::{
@@ -212,8 +214,14 @@ fn get_logo(dom: &tl::VDom<'_>) -> Result<String> {
     .with_context(|| "link[href] empty")?
     .as_utf8_str();
 
-  Ok(thumbnail_url.to_string())
+  let large_thumbnail_url =
+    GOOGLE_IMG_WIDTH_REGEX.replace(&thumbnail_url, "=s1200");
+
+  Ok(large_thumbnail_url.to_string())
 }
+
+static GOOGLE_IMG_WIDTH_REGEX: Lazy<Regex> =
+  Lazy::new(|| Regex::new("=s\\d+").unwrap());
 
 fn get_tags(dom: &tl::VDom<'_>) -> Result<Vec<String>> {
   let mut tags = Vec::new();
