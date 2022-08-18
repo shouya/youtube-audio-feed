@@ -8,7 +8,7 @@ mod feed;
 
 pub use error::Error;
 
-pub const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.foobar.com";
+pub const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.fly.dev";
 pub const GENERATOR_STR: &str = "youtube_audio_feed";
 pub const INVIDIOUS_INSTANCE: &str = "https://invidious.namazso.eu";
 
@@ -17,6 +17,7 @@ async fn main() -> Result<()> {
   let app = Router::new()
     .route("/", get(homepage))
     .route("/health", get(health))
+    .route("/get-podcast", get(feed::channel_podcast_url))
     .route("/channel/:channel_id", get(feed::channel_podcast_xml))
     .route("/audio/:video_id", get(audio::get_audio));
 

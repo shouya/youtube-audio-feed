@@ -2103,6 +2103,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rss",
+ "serde",
  "tl",
  "tokio",
 ]

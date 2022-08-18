@@ -1,10 +1,10 @@
 use std::io::Cursor;
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use atom_syndication::{Entry, Feed};
 use axum::{
   body::{self, Bytes},
-  extract::Path,
+  extract::{Path, Query},
   http::Response,
   response::IntoResponse,
 };
@@ -255,4 +255,74 @@ fn get_tags(dom: &tl::VDom<'_>) -> Result<Vec<String>> {
 struct ExtraInfo {
   logo_url: String,
   tags: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct GetPodcastReq {
+  url: String,
+}
+
+pub async fn channel_podcast_url(
+  Query(req): Query<GetPodcastReq>,
+) -> Result<impl IntoResponse, Error> {
+  let channel_name = extract_youtube_channel_name(&req.url)?;
+  let channel_id = find_youtube_channel_id(&channel_name).await?;
+  let podcast_url = format!("{INSTANCE_PUBLIC_URL}/channel/{channel_id}");
+
+  Ok(podcast_url)
+}
+
+async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
+  let url = format!("https://www.youtube.com/channel/{channel_name}");
+  let resp = reqwest::get(url).await?;
+
+  ensure!(resp.status().is_success(), "Failed to channel page");
+
+  let resp_body = resp.text().await?;
+  let dom = tl::parse(&resp_body, tl::ParserOptions::default())?;
+
+  let link_node = dom
+    .query_selector("link[rel=canonical][href]")
+    .expect("selector is hard-coded, thus must be valid")
+    .next()
+    .with_context(|| "Canonical link not found")?;
+
+  let link_url = link_node
+    .get(dom.parser())
+    .expect("queried node must be within dom")
+    .as_tag()
+    .with_context(|| "link is not a tag as expected")?
+    .attributes()
+    .get("href")
+    .expect("href must exists")
+    .with_context(|| "link[href] empty")?
+    .as_utf8_str();
+
+  let channel_id = link_url
+    .strip_prefix("https://www.youtube.com/channel/")
+    .with_context(|| "unexpected canonical url")?;
+
+  Ok(channel_id.to_string())
+}
+
+fn extract_youtube_channel_name(url: &str) -> Result<String> {
+  let url: Url = url.parse()?;
+
+  ensure!(
+    matches!(url.host_str(), Some("www.youtube.com")),
+    "Invalid youtube url {url}"
+  );
+
+  if let Some(segments) = url.path_segments() {
+    let segs: Vec<_> = segments.take(3).collect();
+    if segs.len() <= 2 {
+      bail!("Invalid youtube url {url}");
+    }
+
+    if ["c", "channel"].contains(&segs[0]) {
+      return Ok(segs[1].to_string());
+    }
+  }
+
+  bail!("Invalid youtube url {url}")
 }
