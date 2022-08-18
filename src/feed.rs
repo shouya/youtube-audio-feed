@@ -215,7 +215,7 @@ fn get_logo(dom: &tl::VDom<'_>) -> Result<String> {
     .as_utf8_str();
 
   let large_thumbnail_url =
-    GOOGLE_IMG_WIDTH_REGEX.replace(&thumbnail_url, "=s1200");
+    GOOGLE_IMG_WIDTH_REGEX.replace(&thumbnail_url, "=s1400");
 
   Ok(large_thumbnail_url.to_string())
 }
