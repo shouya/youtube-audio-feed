@@ -55,13 +55,23 @@ where
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
   let app = Router::new()
+    .route("/", get(homepage))
+    .route("/health", get(health))
     .route("/channel/:channel_id", get(channel_podcast_xml))
     .route("/audio/:video_id", get(get_audio));
 
-  axum::Server::bind(&"127.0.0.1:8080".parse().unwrap())
+  axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
     .serve(app.into_make_service())
     .await
     .map_err(|e| e.into())
+}
+
+async fn homepage() -> impl IntoResponse {
+  "Hello!".to_owned()
+}
+
+async fn health() -> impl IntoResponse {
+  "ok!".to_owned()
 }
 
 async fn channel_podcast_xml(
