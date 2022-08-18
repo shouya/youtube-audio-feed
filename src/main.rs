@@ -90,8 +90,8 @@ async fn channel_podcast_xml(
   podcast_channel.pretty_write_to(&mut output, b' ', 2)?;
 
   let resp = Response::builder()
-    .status(StatusCode::INTERNAL_SERVER_ERROR)
-    .header("Content-Type", "application/rss+xml; charset=UTF-8")
+    .status(StatusCode::OK)
+    .header(header::CONTENT_TYPE, "application/rss+xml; charset=UTF-8")
     .body(body::Full::new(Bytes::from(output)))?;
 
   Ok(resp)
