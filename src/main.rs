@@ -295,7 +295,7 @@ async fn get_extra_info(channel_id: &str) -> Result<ExtraInfo> {
 
 fn get_logo(dom: &tl::VDom<'_>) -> Result<String> {
   let thumbnail_node = dom
-    .query_selector("link[rel=\"image_src\",href]")
+    .query_selector("link[rel=image_src][href]")
     .expect("selector is hard-coded, thus must be valid")
     .next()
     .with_context(|| "Thumbnail not found")?;
@@ -317,7 +317,9 @@ fn get_logo(dom: &tl::VDom<'_>) -> Result<String> {
 fn get_tags(dom: &tl::VDom<'_>) -> Result<Vec<String>> {
   let mut tags = Vec::new();
   let node_iter = dom
-    .query_selector("meta[property=\"og:video:tag\",content]")
+    // a clumpsy and inaccurate way to query for
+    // [property=og:video:tag] because tl doesn't support it.
+    .query_selector("meta[property^=og][property*=video][property$=tag][content]")
     .expect("selector should be valid");
 
   for node in node_iter {
