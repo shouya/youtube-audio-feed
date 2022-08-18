@@ -265,8 +265,12 @@ pub struct GetPodcastReq {
 pub async fn channel_podcast_url(
   Query(req): Query<GetPodcastReq>,
 ) -> Result<impl IntoResponse, Error> {
-  let channel_name = extract_youtube_channel_name(&req.url)?;
-  let channel_id = find_youtube_channel_id(&channel_name).await?;
+  let channel_id = match extract_youtube_channel_name(&req.url)? {
+    ChannelIdentifier::Id(id) => id,
+    ChannelIdentifier::Name(name) => {
+      find_youtube_channel_id(&name).await?
+    }
+  };
   let podcast_url = format!("{INSTANCE_PUBLIC_URL}/channel/{channel_id}");
 
   Ok(podcast_url)
@@ -305,7 +309,12 @@ async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
   Ok(channel_id.to_string())
 }
 
-fn extract_youtube_channel_name(url: &str) -> Result<String> {
+enum ChannelIdentifier {
+  Id(String),
+  Name(String),
+}
+
+fn extract_youtube_channel_name(url: &str) -> Result<ChannelIdentifier> {
   let url: Url = url.parse()?;
 
   ensure!(
@@ -319,9 +328,13 @@ fn extract_youtube_channel_name(url: &str) -> Result<String> {
       bail!("Invalid path {url}");
     }
 
-    if ["c", "channel"].contains(&segs[0]) {
-      return Ok(segs[1].to_string());
-    }
+    let id = match segs[0] {
+      "c" => ChannelIdentifier::Name(segs[1].to_string()),
+      "channel" => ChannelIdentifier::Id(segs[1].to_string()),
+      _ => bail!("Invalid path {url}"),
+    };
+
+    return Ok(id);
   }
 
   bail!("Invalid youtube url {url}")
