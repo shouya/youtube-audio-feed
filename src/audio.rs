@@ -1,4 +1,3 @@
-use anyhow::{ensure, Context};
 use axum::body::StreamBody;
 use axum::{
   body, extract::Path, headers::HeaderMap, http::Response,
@@ -6,7 +5,7 @@ use axum::{
 };
 use reqwest::header;
 
-use crate::{Result, INVIDIOUS_INSTANCE};
+use crate::{Error, Result, INVIDIOUS_INSTANCE};
 
 #[axum::debug_handler]
 pub async fn get_audio(
@@ -45,16 +44,17 @@ async fn get_playable_link(video_id: &str) -> Result<String> {
     .send()
     .await?;
 
-  ensure!(
-    download.status().is_redirection(),
-    "Invidious returns other than redirection"
-  );
+  // rewrite above ensure with if
+  if !download.status().is_redirection() {
+    return Err(Error::Invidious("expect redirection"));
+  }
 
   let target_path = download
     .headers()
     .get(header::LOCATION)
-    .with_context(|| "Target location not found")?
-    .to_str()?;
+    .ok_or(Error::Invidious("missing location header"))?
+    .to_str()
+    .map_err(|_| Error::Invidious("invalid location header"))?;
 
   Ok(format!("{INVIDIOUS_INSTANCE}{target_path}"))
 }

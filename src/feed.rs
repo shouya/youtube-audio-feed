@@ -54,7 +54,7 @@ fn convert_feed(feed: Feed, extra: ExtraInfo) -> Result<Channel> {
   let mut itunes = ITunesChannelExtensionBuilder::default();
 
   itunes
-    .author(Some(feed.authors.iter().map(|x| x.name).join(", ")))
+    .author(Some(feed.authors.iter().map(|x| &x.name).join(", ")))
     .image(Some(extra.logo_url))
     .categories(
       extra
@@ -81,28 +81,41 @@ fn convert_feed(feed: Feed, extra: ExtraInfo) -> Result<Channel> {
 }
 
 fn map_entry(entry: Entry) -> Result<rss::Item> {
+  // used for reporting error
   let media_group = &entry
     .extensions
     .get("media")
-    .ok_or(Error::InvalidFeedEntry(entry, "not media extension"))?
+    .ok_or(Error::InvalidFeedEntry(
+      entry.clone(),
+      "not media extension",
+    ))?
     .get("group")
-    .ok_or(Error::InvalidFeedEntry(entry, "not media group"))?
+    .ok_or(Error::InvalidFeedEntry(entry.clone(), "not media group"))?
     .first()
     .expect("unreachable")
     .children;
 
   let media_description = &media_group
     .get("description")
-    .ok_or(Error::InvalidFeedEntry(entry, "no media:description found"))?
+    .ok_or(Error::InvalidFeedEntry(
+      entry.clone(),
+      "no media:description found",
+    ))?
     .first()
     .expect("unreachable")
     .value
     .as_ref()
-    .ok_or(Error::InvalidFeedEntry(entry, "no media:description value"))?;
+    .ok_or(Error::InvalidFeedEntry(
+      entry.clone(),
+      "no media:description value",
+    ))?;
 
   let media_thumbnail = &media_group
     .get("thumbnail")
-    .ok_or(Error::InvalidFeedEntry(entry, "no media:thumbnail found"))?
+    .ok_or(Error::InvalidFeedEntry(
+      entry.clone(),
+      "no media:thumbnail found",
+    ))?
     .first()
     .expect("unreachable")
     .attrs;
@@ -112,7 +125,7 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
     .first()
     .cloned()
     .map(|x| x.href)
-    .ok_or(Error::InvalidFeedEntry(entry, "no link found"))?;
+    .ok_or(Error::InvalidFeedEntry(entry.clone(), "no link found"))?;
   let audio_url = translate_video_to_audio_url(video_url.as_ref())?;
 
   let description_html = format!(

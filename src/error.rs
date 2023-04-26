@@ -1,6 +1,5 @@
 use atom_syndication::Entry;
 use axum::response::{IntoResponse, Response};
-use http_types::Url;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -24,9 +23,11 @@ pub enum Error {
   #[error("unsupported url: {0} ({1})")]
   UnsupportedURL(String, &'static str),
   #[error("http error: {0}")]
-  HTTPError(#[from] http::Error),
+  HTTP(#[from] http::Error),
   #[error("io error: {0}")]
   IO(#[from] std::io::Error),
+  #[error("request invidious error: {0}")]
+  Invidious(&'static str),
 }
 
 impl IntoResponse for Error {
@@ -42,7 +43,7 @@ impl IntoResponse for Error {
       ParseURL(_) => StatusCode::BAD_GATEWAY,
       InvalidHTML(_) => StatusCode::BAD_GATEWAY,
       UnsupportedURL(_, _) => StatusCode::BAD_REQUEST,
-      HTTPError(_) => StatusCode::BAD_GATEWAY,
+      HTTP(_) => StatusCode::BAD_GATEWAY,
       _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
 

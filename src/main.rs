@@ -25,7 +25,9 @@ async fn main() -> Result<()> {
   axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
     .serve(app.into_make_service())
     .await
-    .map_err(|e| e.into())
+    .expect("Failed to start server");
+
+  Ok(())
 }
 
 pub const HOMEPAGE_HTML: &str = include_str!("../html/homepage.html");
