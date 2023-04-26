@@ -1,13 +1,14 @@
 use std::io::Cursor;
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{bail, ensure, Context};
 use atom_syndication::{Entry, Feed};
 use axum::{
   body::{self, Bytes},
   extract::{Path, Query},
   headers::ContentType,
   http::Response,
-  response::IntoResponse, TypedHeader,
+  response::IntoResponse,
+  TypedHeader,
 };
 use http_types::Url;
 use once_cell::sync::Lazy;
@@ -20,13 +21,14 @@ use rss::{
   Channel, EnclosureBuilder,
 };
 
-use crate::{Error, GENERATOR_STR, INSTANCE_PUBLIC_URL};
+use crate::{Error, Result, GENERATOR_STR, INSTANCE_PUBLIC_URL};
 
 pub async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse> {
   let (feed, extra_info) =
-    tokio::try_join!(get_feed(&channel_id), get_extra_info(&channel_id))?;
+    tokio::try_join!(get_feed(&channel_id), get_extra_info(&channel_id))
+      .map_err(|_| Error::FailedFetchingFeed)?;
 
   let podcast_channel = convert_feed(feed, extra_info)?;
   let mut output = Vec::new();
@@ -40,7 +42,7 @@ pub async fn channel_podcast_xml(
   Ok(resp)
 }
 
-fn convert_feed(feed: Feed, extra: ExtraInfo) -> anyhow::Result<Channel> {
+fn convert_feed(feed: Feed, extra: ExtraInfo) -> Result<Channel> {
   let mut channel = Channel::default();
 
   channel.set_title(&*feed.title);
@@ -79,7 +81,8 @@ fn convert_feed(feed: Feed, extra: ExtraInfo) -> anyhow::Result<Channel> {
     .entries
     .into_iter()
     .map(map_entry)
-    .collect::<Result<Vec<_>>>()?;
+    .collect::<Result<Vec<_>>>()
+    .map_err(|e| Error::FailedConvertingFeed(e));
 
   channel.set_items(items);
 
@@ -265,7 +268,7 @@ pub struct GetPodcastReq {
 
 pub async fn channel_podcast_url(
   Query(req): Query<GetPodcastReq>,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse> {
   let channel_id = match extract_youtube_channel_name(&req.url)? {
     ChannelIdentifier::Id(id) => id,
     ChannelIdentifier::Name(name) => find_youtube_channel_id(&name).await?,
@@ -318,9 +321,8 @@ fn extract_youtube_channel_name(url: &str) -> Result<ChannelIdentifier> {
   let url: Url = url.parse()?;
 
   ensure!(
-    matches!(url.host_str(), Some("www.youtube.com")) ||
-      matches!(url.host_str(), Some("m.youtube.com"))
-      ,
+    matches!(url.host_str(), Some("www.youtube.com"))
+      || matches!(url.host_str(), Some("m.youtube.com")),
     "Invalid youtube host {url}"
   );
 

@@ -1,4 +1,4 @@
-use anyhow::{ensure, Context, Result};
+use anyhow::{ensure, Context};
 use axum::body::StreamBody;
 use axum::{
   body, extract::Path, headers::HeaderMap, http::Response,
@@ -6,13 +6,13 @@ use axum::{
 };
 use reqwest::header;
 
-use crate::{Error, INVIDIOUS_INSTANCE};
+use crate::{Result, INVIDIOUS_INSTANCE};
 
 #[axum::debug_handler]
 pub async fn get_audio(
   Path(video_id): Path<String>,
   headers: HeaderMap,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse> {
   let playable_link = get_playable_link(&video_id).await?;
   proxy_play_link(&playable_link, headers).await
 }
@@ -20,7 +20,7 @@ pub async fn get_audio(
 async fn proxy_play_link(
   url: &str,
   mut headers: HeaderMap,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse> {
   headers.remove(header::HOST);
 
   let resp = reqwest::Client::new()
@@ -56,7 +56,7 @@ async fn get_playable_link(video_id: &str) -> Result<String> {
     .with_context(|| "Target location not found")?
     .to_str()?;
 
-  return Ok(format!("{INVIDIOUS_INSTANCE}{target_path}"));
+  Ok(format!("{INVIDIOUS_INSTANCE}{target_path}"))
 }
 
 struct StreamResponse(reqwest::Response);

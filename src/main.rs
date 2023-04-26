@@ -1,5 +1,3 @@
-use anyhow::Result;
-
 use axum::{
   headers::ContentType, response::IntoResponse, routing::get, Router,
   TypedHeader,
@@ -9,7 +7,7 @@ mod audio;
 mod error;
 mod feed;
 
-pub use error::Error;
+pub use error::{Error, Result};
 
 pub const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.fly.dev";
 pub const GENERATOR_STR: &str = "https://github.com/shouya/youtube_audio_feed";
