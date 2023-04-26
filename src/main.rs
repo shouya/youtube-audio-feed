@@ -9,7 +9,12 @@ mod feed;
 
 pub use error::{Error, Result};
 
+#[cfg(release)]
 pub const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.fly.dev";
+
+#[cfg(not(release))]
+pub const INSTANCE_PUBLIC_URL: &str = "http://0.0.0.0:8080";
+
 pub const GENERATOR_STR: &str = "https://github.com/shouya/youtube_audio_feed";
 pub const INVIDIOUS_INSTANCE: &str = "https://invidious.namazso.eu";
 
