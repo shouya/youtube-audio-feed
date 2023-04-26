@@ -5,3 +5,5 @@ Convert any Youtube channel into an audio-only podcast feed. Listen on your favo
 Public instance: https://youtube-audio-feed.fly.dev
 
 Example feed: https://youtube-audio-feed.fly.dev/channel/UCZYTClx2T1of7BRZ86-8fow (SciShow)
+
+The data is based on [[https://docs.piped.video/docs/api-documentation/][Piped API]] which does all the heavy lifting.
