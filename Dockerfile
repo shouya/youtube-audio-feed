@@ -1,4 +1,4 @@
-FROM docker.io/library/rust:1-alpine AS BUILDER
+FROM docker.io/library/rust:alpine AS BUILDER
 
 RUN apk add --no-cache musl-dev
 
