@@ -1,6 +1,5 @@
 use std::io::Cursor;
 
-use anyhow::{bail, ensure, Context};
 use atom_syndication::{Entry, Feed};
 use axum::{
   body::{self, Bytes},
@@ -11,6 +10,7 @@ use axum::{
   TypedHeader,
 };
 use http_types::Url;
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::{header, StatusCode};
@@ -27,8 +27,7 @@ pub async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
 ) -> Result<impl IntoResponse> {
   let (feed, extra_info) =
-    tokio::try_join!(get_feed(&channel_id), get_extra_info(&channel_id))
-      .map_err(|_| Error::FailedFetchingFeed)?;
+    tokio::try_join!(get_feed(&channel_id), get_extra_info(&channel_id))?;
 
   let podcast_channel = convert_feed(feed, extra_info)?;
   let mut output = Vec::new();
@@ -55,14 +54,7 @@ fn convert_feed(feed: Feed, extra: ExtraInfo) -> Result<Channel> {
   let mut itunes = ITunesChannelExtensionBuilder::default();
 
   itunes
-    .author(Some(
-      feed
-        .authors
-        .iter()
-        .map(|x| x.name.as_ref())
-        .collect::<Vec<_>>()
-        .join(", "),
-    ))
+    .author(Some(feed.authors.iter().map(|x| x.name).join(", ")))
     .image(Some(extra.logo_url))
     .categories(
       extra
@@ -81,8 +73,7 @@ fn convert_feed(feed: Feed, extra: ExtraInfo) -> Result<Channel> {
     .entries
     .into_iter()
     .map(map_entry)
-    .collect::<Result<Vec<_>>>()
-    .map_err(|e| Error::FailedConvertingFeed(e));
+    .collect::<Result<Vec<_>>>()?;
 
   channel.set_items(items);
 
@@ -93,27 +84,27 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
   let media_group = &entry
     .extensions
     .get("media")
-    .with_context(|| "no media extension found")?
+    .ok_or(Error::InvalidFeedEntry(entry, "not media extension"))?
     .get("group")
-    .with_context(|| "no media:group extension found")?
+    .ok_or(Error::InvalidFeedEntry(entry, "not media group"))?
     .first()
-    .with_context(|| "unreachable")?
+    .expect("unreachable")
     .children;
 
   let media_description = &media_group
     .get("description")
-    .with_context(|| "no media:description found")?
+    .ok_or(Error::InvalidFeedEntry(entry, "no media:description found"))?
     .first()
-    .with_context(|| "unreachable")?
+    .expect("unreachable")
     .value
     .as_ref()
-    .with_context(|| "media:description empty")?;
+    .ok_or(Error::InvalidFeedEntry(entry, "no media:description value"))?;
 
   let media_thumbnail = &media_group
     .get("thumbnail")
-    .with_context(|| "no media:thumbnail found")?
+    .ok_or(Error::InvalidFeedEntry(entry, "no media:thumbnail found"))?
     .first()
-    .with_context(|| "unreachable")?
+    .expect("unreachable")
     .attrs;
 
   let video_url = entry
@@ -121,7 +112,7 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
     .first()
     .cloned()
     .map(|x| x.href)
-    .with_context(|| "video url not found")?;
+    .ok_or(Error::InvalidFeedEntry(entry, "no link found"))?;
   let audio_url = translate_video_to_audio_url(video_url.as_ref())?;
 
   let description_html = format!(
@@ -170,7 +161,9 @@ fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
   let video_id = uri
     .query_pairs()
     .find_map(|(k, v)| (k == "v").then_some(v))
-    .with_context(|| "Invalid video url")?;
+    .ok_or_else(|| {
+      Error::UnsupportedURL(uri_str.into(), "v parameter not found")
+    })?;
 
   Ok(format!("{INSTANCE_PUBLIC_URL}/audio/{video_id}"))
 }
@@ -189,8 +182,6 @@ async fn get_extra_info(channel_id: &str) -> Result<ExtraInfo> {
   let url = format!("https://www.youtube.com/channel/{channel_id}");
   let resp = reqwest::get(url).await?;
 
-  ensure!(resp.status().is_success(), "Failed to get channel page");
-
   let resp_body = resp.text().await?;
   let dom = tl::parse(&resp_body, tl::ParserOptions::default())?;
 
@@ -205,17 +196,17 @@ fn get_logo(dom: &tl::VDom<'_>) -> Result<String> {
     .query_selector("link[rel=image_src][href]")
     .expect("selector is hard-coded, thus must be valid")
     .next()
-    .with_context(|| "Thumbnail not found")?;
+    .ok_or(Error::InvalidHTML("link[rel=image_src]"))?;
 
   let thumbnail_url = thumbnail_node
     .get(dom.parser())
     .expect("queried node must be within dom")
     .as_tag()
-    .with_context(|| "link is not a tag as expected")?
+    .ok_or(Error::InvalidHTML("thumbnail"))?
     .attributes()
     .get("href")
     .expect("href must exists")
-    .with_context(|| "link[href] empty")?
+    .ok_or(Error::InvalidHTML("link[href]"))?
     .as_utf8_str();
 
   let large_thumbnail_url =
@@ -242,11 +233,11 @@ fn get_tags(dom: &tl::VDom<'_>) -> Result<Vec<String>> {
       .get(dom.parser())
       .expect("queried node must be within dom")
       .as_tag()
-      .with_context(|| "meta is not a tag as expected")?
+      .ok_or(Error::InvalidHTML("meta[property=og:video:tag]"))?
       .attributes()
       .get("content")
       .expect("content must exists")
-      .with_context(|| "meta[content] empty")?
+      .ok_or(Error::InvalidHTML("meta[property=og:video:tag] content"))?
       .as_utf8_str()
       .into_owned();
 
@@ -283,8 +274,6 @@ async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
   let url = format!("https://www.youtube.com/c/{channel_name}");
   let resp = reqwest::get(url).await?;
 
-  ensure!(resp.status().is_success(), "Failed to get channel page");
-
   let resp_body = resp.text().await?;
   let dom = tl::parse(&resp_body, tl::ParserOptions::default())?;
 
@@ -292,22 +281,22 @@ async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
     .query_selector("link[rel=canonical][href]")
     .expect("selector is hard-coded, thus must be valid")
     .next()
-    .with_context(|| "Canonical link not found")?;
+    .ok_or(Error::InvalidHTML("link[rel=canonical]"))?;
 
   let link_url = link_node
     .get(dom.parser())
     .expect("queried node must be within dom")
     .as_tag()
-    .with_context(|| "link is not a tag as expected")?
+    .ok_or(Error::InvalidHTML("link[rel=canonical]"))?
     .attributes()
     .get("href")
     .expect("href must exists")
-    .with_context(|| "link[href] empty")?
+    .ok_or(Error::InvalidHTML("link[rel=canonical]"))?
     .as_utf8_str();
 
   let channel_id = link_url
     .strip_prefix("https://www.youtube.com/channel/")
-    .with_context(|| "unexpected canonical url")?;
+    .ok_or(Error::InvalidHTML("link[rel=canonical] url prefix"))?;
 
   Ok(channel_id.to_string())
 }
@@ -320,26 +309,27 @@ enum ChannelIdentifier {
 fn extract_youtube_channel_name(url: &str) -> Result<ChannelIdentifier> {
   let url: Url = url.parse()?;
 
-  ensure!(
-    matches!(url.host_str(), Some("www.youtube.com"))
-      || matches!(url.host_str(), Some("m.youtube.com")),
-    "Invalid youtube host {url}"
-  );
+  match url.host_str() {
+    Some("www.youtube.com") | Some("m.youtube.com") => (),
+    _ => return Err(Error::UnsupportedURL(url.into(), "not youtube")),
+  }
 
   if let Some(segments) = url.path_segments() {
     let segs: Vec<_> = segments.take(3).collect();
     if segs.len() < 2 {
-      bail!("Invalid path {url}");
+      return Err(Error::UnsupportedURL(url.into(), "video path not found"));
     }
 
     let id = match segs[0] {
       "c" => ChannelIdentifier::Name(segs[1].to_string()),
       "channel" => ChannelIdentifier::Id(segs[1].to_string()),
-      _ => bail!("Invalid path {url}"),
+      _ => {
+        return Err(Error::UnsupportedURL(url.into(), "video path not found"))
+      }
     };
 
     return Ok(id);
   }
 
-  bail!("Invalid youtube url {url}")
+  Err(Error::UnsupportedURL(url.into(), "invalid youtube url"))
 }
