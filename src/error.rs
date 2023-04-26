@@ -6,7 +6,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
-  #[error("failed parsing url: {0}")]
+  #[error("failed requesting upstream: {0}")]
   RequestUpstream(#[from] reqwest::Error),
   #[error("atom feed format error: {0}")]
   AtomFormat(#[from] atom_syndication::Error),

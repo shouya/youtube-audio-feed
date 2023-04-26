@@ -16,7 +16,7 @@ pub const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.fly.dev";
 pub const INSTANCE_PUBLIC_URL: &str = "http://0.0.0.0:8080";
 
 pub const GENERATOR_STR: &str = "https://github.com/shouya/youtube_audio_feed";
-pub const INVIDIOUS_INSTANCE: &str = "https://invidious.namazso.eu";
+pub const PIPED_INSTANCE: &str = "https://pipedapi.kavin.rocks";
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {

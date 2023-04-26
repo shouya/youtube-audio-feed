@@ -4,8 +4,9 @@ use axum::{
   response::IntoResponse,
 };
 use reqwest::header;
+use serde_query::{DeserializeQuery, Query};
 
-use crate::{Error, Result, INVIDIOUS_INSTANCE};
+use crate::{Result, PIPED_INSTANCE};
 
 #[axum::debug_handler]
 pub async fn get_audio(
@@ -31,32 +32,25 @@ async fn proxy_play_link(
   Ok(StreamResponse(resp))
 }
 
+// https://docs.piped.video/docs/api-documentation/
+#[derive(DeserializeQuery)]
+struct PipedStreamResp {
+  #[query(".audioStreams.[0].url")]
+  url: String,
+}
+
 async fn get_playable_link(video_id: &str) -> Result<String> {
-  let download = reqwest::Client::builder()
-    .redirect(reqwest::redirect::Policy::none())
-    .build()?
-    .post(format!("{INVIDIOUS_INSTANCE}/download"))
-    .form(&[
-      ("id", video_id),
-      ("title", "foobar"),
-      ("download_widget", "{\"itag\":140,\"ext\":\"mp4\"}"),
-    ])
+  let piped_url = format!("{PIPED_INSTANCE}/streams/{video_id}");
+  let resp: PipedStreamResp = reqwest::Client::new()
+    .get(piped_url)
+    .header("User-Agent", "Mozilla/5.0")
     .send()
-    .await?;
+    .await?
+    .json::<Query<PipedStreamResp>>()
+    .await?
+    .into();
 
-  // rewrite above ensure with if
-  if !download.status().is_redirection() {
-    return Err(Error::Invidious("expect redirection"));
-  }
-
-  let target_path = download
-    .headers()
-    .get(header::LOCATION)
-    .ok_or(Error::Invidious("missing location header"))?
-    .to_str()
-    .map_err(|_| Error::Invidious("invalid location header"))?;
-
-  Ok(format!("{INVIDIOUS_INSTANCE}{target_path}"))
+  Ok(resp.url)
 }
 
 struct StreamResponse(reqwest::Response);
