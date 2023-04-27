@@ -14,17 +14,11 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::{header, StatusCode};
-use rss::{
-  extension::itunes::{
-    ITunesCategory, ITunesChannelExtensionBuilder, ITunesItemExtensionBuilder,
-  },
-  Channel, EnclosureBuilder,
-};
 use serde::Deserialize;
 
 use crate::{
   podcast::{Episode, Podcast},
-  Error, Result, GENERATOR_STR, INSTANCE_PUBLIC_URL, PIPED_INSTANCE, W,
+  Error, Result, INSTANCE_PUBLIC_URL, PIPED_INSTANCE, W,
 };
 
 pub async fn channel_podcast_xml(
@@ -48,45 +42,6 @@ pub async fn channel_podcast_xml(
     .body(body::Full::new(Bytes::from(output)))?;
 
   Ok(resp)
-}
-
-fn convert_feed(feed: Feed, extra: ExtraInfo) -> Result<Channel> {
-  let mut channel = Channel::default();
-
-  channel.set_title(&*feed.title);
-  channel.set_description(&*feed.title);
-
-  channel.set_last_build_date(Some(feed.updated.to_rfc2822()));
-  channel.set_language(feed.lang);
-  channel.set_generator(Some(GENERATOR_STR.into()));
-
-  let mut itunes = ITunesChannelExtensionBuilder::default();
-
-  itunes
-    .author(Some(feed.authors.iter().map(|x| &x.name).join(", ")))
-    .image(Some(extra.logo_url))
-    .categories(
-      extra
-        .tags
-        .into_iter()
-        .map(|tag| ITunesCategory {
-          text: tag,
-          subcategory: None,
-        })
-        .collect::<Vec<_>>(),
-    );
-
-  channel.set_itunes_ext(itunes.build());
-
-  let items = feed
-    .entries
-    .into_iter()
-    .map(map_entry)
-    .collect::<Result<Vec<_>>>()?;
-
-  channel.set_items(items);
-
-  Ok(channel)
 }
 
 fn make_podcast(
@@ -116,55 +71,6 @@ fn make_podcast(
   Ok(podcast)
 }
 
-fn map_entry(entry: Entry) -> Result<rss::Item> {
-  // used for reporting error
-  let description = W(&entry).description()?;
-  let thumbnail = W(&entry).thumbnail()?;
-  let video_url = W(&entry).link()?;
-
-  let audio_url = translate_video_to_audio_url(video_url.as_ref())?;
-
-  let description_html = format!(
-    "<img loading=\"lazy\" class=\"size-thumbnail\"\
-          src=\"{}\" width=\"{}\" height=\"{}\"/>\n\
-     <p>{}</p>\n\
-     <p><a href=\"{}\">{}</a></p>\n",
-    &thumbnail.url,
-    &thumbnail.width,
-    &thumbnail.height,
-    &description,
-    &video_url,
-    &video_url,
-  );
-
-  let enclosure = EnclosureBuilder::default()
-    .url(audio_url)
-    .mime_type("audio/mpeg".to_owned())
-    .build();
-
-  let itunes = ITunesItemExtensionBuilder::default()
-    .summary(Some(description))
-    .author(entry.authors.first().map(|x| x.name.clone()))
-    .image(Some(thumbnail.url.clone()))
-    .build();
-
-  let item = rss::Item {
-    title: Some(entry.title.as_str().to_owned()),
-    link: Some(video_url),
-    pub_date: Some(entry.updated.to_rfc2822()),
-    guid: Some(rss::Guid {
-      value: entry.id.clone(),
-      permalink: true,
-    }),
-    description: Some(description_html),
-    itunes_ext: Some(itunes),
-    enclosure: Some(enclosure),
-    ..Default::default()
-  };
-
-  Ok(item)
-}
-
 fn make_episode(entry: Entry, piped_channel: &PipedChannel) -> Result<Episode> {
   let mut episode = Episode::default();
 
@@ -172,7 +78,6 @@ fn make_episode(entry: Entry, piped_channel: &PipedChannel) -> Result<Episode> {
   let thumbnail = W(&entry).thumbnail()?;
   let video_id = W(&entry).video_id()?;
   let video_url = W(&entry).link()?;
-  let audio_url = translate_video_to_audio_url(video_url.as_ref())?;
 
   episode.title = entry.title.to_string();
   episode.link = video_url;

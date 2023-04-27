@@ -87,15 +87,14 @@ impl From<Episode> for rss::Item {
       .mime_type("audio/mpeg".to_owned())
       .build();
 
-    let mut itunes =
-      rss::extension::itunes::ITunesItemExtensionBuilder::default()
-        .summary(Some(episode.description))
-        .author(Some(episode.author))
-        .image(Some(episode.thumbnail.url))
-        .duration(
-          (episode.duration > 0).then(|| seconds_to_duration(episode.duration)),
-        )
-        .build();
+    let itunes = rss::extension::itunes::ITunesItemExtensionBuilder::default()
+      .summary(Some(episode.description))
+      .author(Some(episode.author))
+      .image(Some(episode.thumbnail.url))
+      .duration(
+        (episode.duration > 0).then(|| seconds_to_duration(episode.duration)),
+      )
+      .build();
 
     rss::Item {
       title: Some(episode.title),
