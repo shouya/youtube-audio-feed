@@ -1,3 +1,5 @@
+use crate::GENERATOR_STR;
+
 #[derive(Debug, Default)]
 pub struct Podcast {
   pub title: String,
@@ -31,8 +33,9 @@ impl From<Podcast> for rss::Channel {
       .description(podcast.description)
       .link(podcast.channel_url)
       .last_build_date(Some(podcast.last_build_date))
-      .language(Some(podcast.language))
+      .language((!podcast.language.is_empty()).then_some(podcast.language))
       .itunes_ext(Some(itunes_ext))
+      .generator(Some(GENERATOR_STR.to_owned()))
       .build();
 
     for episode in podcast.episodes {
