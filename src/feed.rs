@@ -20,14 +20,22 @@ use rss::{
   },
   Channel, EnclosureBuilder,
 };
+use serde::Deserialize;
 
-use crate::{Error, Result, GENERATOR_STR, INSTANCE_PUBLIC_URL};
+use crate::{
+  Error, Result, GENERATOR_STR, INSTANCE_PUBLIC_URL, PIPED_INSTANCE,
+};
 
 pub async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
 ) -> Result<impl IntoResponse> {
-  let (feed, extra_info) =
-    tokio::try_join!(get_feed(&channel_id), get_extra_info(&channel_id))?;
+  let (feed, extra_info, piped_channel) = tokio::try_join!(
+    get_feed(&channel_id),
+    get_extra_info(&channel_id),
+    get_piped_channel(&channel_id)
+  )?;
+
+  dbg!(piped_channel);
 
   let podcast_channel = convert_feed(feed, extra_info)?;
   let mut output = Vec::new();
@@ -263,6 +271,39 @@ fn get_tags(dom: &tl::VDom<'_>) -> Result<Vec<String>> {
 struct ExtraInfo {
   logo_url: String,
   tags: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PipedChannel {
+  related_streams: Vec<PipedStream>,
+}
+#[derive(Debug, Deserialize)]
+struct PipedStream {
+  #[serde(rename = "url")]
+  video_id: String,
+  duration: u64,
+}
+
+async fn get_piped_channel(channel_id: &str) -> Result<PipedChannel> {
+  let url = format!("{PIPED_INSTANCE}/channel/{channel_id}");
+  let mut channel = reqwest::Client::new()
+    .get(&url)
+    .header("User-Agent", "Mozilla/5.0")
+    .send()
+    .await?
+    .json::<PipedChannel>()
+    .await?;
+
+  for stream in &mut channel.related_streams {
+    stream.video_id = stream
+      .video_id
+      .strip_prefix("/watch?v=")
+      .unwrap()
+      .to_string();
+  }
+
+  Ok(channel)
 }
 
 #[derive(serde::Deserialize)]
