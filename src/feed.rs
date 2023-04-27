@@ -49,20 +49,23 @@ fn make_podcast(
   extra_info: ExtraInfo,
   piped_channel: PipedChannel,
 ) -> Result<Podcast> {
-  let mut podcast = Podcast::default();
-
-  podcast.title = feed.title.to_string();
-  podcast.description = piped_channel.description.clone();
-  podcast.last_build_date = feed.updated.to_rfc2822();
-  podcast.language = feed.lang.unwrap_or_default();
-  podcast.author = feed.authors.iter().map(|x| &x.name).join(", ");
-  podcast.logo_url = extra_info.logo_url;
-  podcast.categories = extra_info.tags;
-  podcast.channel_url = feed
+  let channel_url = feed
     .links
     .first()
     .map(|x| x.href.clone())
     .unwrap_or_default();
+
+  let mut podcast = Podcast {
+    title: feed.title.to_string(),
+    description: piped_channel.description.clone(),
+    last_build_date: feed.updated.to_rfc2822(),
+    language: feed.lang.unwrap_or_default(),
+    author: feed.authors.iter().map(|x| &x.name).join(", "),
+    logo_url: extra_info.logo_url,
+    categories: extra_info.tags,
+    channel_url,
+    ..Default::default()
+  };
 
   for entry in feed.entries.into_iter() {
     podcast.episodes.push(make_episode(entry, &piped_channel)?);
@@ -81,7 +84,7 @@ fn make_episode(entry: Entry, piped_channel: &PipedChannel) -> Result<Episode> {
 
   episode.title = entry.title.to_string();
   episode.link = video_url;
-  episode.description = description.to_string();
+  episode.description = description;
   episode.pub_date = entry.updated.to_rfc2822();
   episode.author = entry
     .authors
