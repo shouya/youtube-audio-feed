@@ -23,7 +23,8 @@ use rss::{
 use serde::Deserialize;
 
 use crate::{
-  Error, Result, GENERATOR_STR, INSTANCE_PUBLIC_URL, PIPED_INSTANCE,
+  podcast::{Episode, Podcast},
+  Error, Result, GENERATOR_STR, INSTANCE_PUBLIC_URL, PIPED_INSTANCE, W,
 };
 
 pub async fn channel_podcast_xml(
@@ -32,12 +33,12 @@ pub async fn channel_podcast_xml(
   let (feed, extra_info, piped_channel) = tokio::try_join!(
     get_feed(&channel_id),
     get_extra_info(&channel_id),
-    get_piped_channel(&channel_id)
+    PipedChannel::get(&channel_id)
   )?;
 
-  dbg!(piped_channel);
+  let podcast = make_podcast(feed, extra_info, piped_channel)?;
+  let podcast_channel: rss::Channel = podcast.into();
 
-  let podcast_channel = convert_feed(feed, extra_info)?;
   let mut output = Vec::new();
   podcast_channel.pretty_write_to(&mut output, b' ', 2)?;
 
@@ -88,52 +89,39 @@ fn convert_feed(feed: Feed, extra: ExtraInfo) -> Result<Channel> {
   Ok(channel)
 }
 
-fn map_entry(entry: Entry) -> Result<rss::Item> {
-  // used for reporting error
-  let media_group = &entry
-    .extensions
-    .get("media")
-    .ok_or(Error::InvalidFeedEntry(
-      entry.clone(),
-      "not media extension",
-    ))?
-    .get("group")
-    .ok_or(Error::InvalidFeedEntry(entry.clone(), "not media group"))?
-    .first()
-    .expect("unreachable")
-    .children;
+fn make_podcast(
+  feed: Feed,
+  extra_info: ExtraInfo,
+  piped_channel: PipedChannel,
+) -> Result<Podcast> {
+  let mut podcast = Podcast::default();
 
-  let media_description = &media_group
-    .get("description")
-    .ok_or(Error::InvalidFeedEntry(
-      entry.clone(),
-      "no media:description found",
-    ))?
-    .first()
-    .expect("unreachable")
-    .value
-    .as_ref()
-    .ok_or(Error::InvalidFeedEntry(
-      entry.clone(),
-      "no media:description value",
-    ))?;
-
-  let media_thumbnail = &media_group
-    .get("thumbnail")
-    .ok_or(Error::InvalidFeedEntry(
-      entry.clone(),
-      "no media:thumbnail found",
-    ))?
-    .first()
-    .expect("unreachable")
-    .attrs;
-
-  let video_url = entry
+  podcast.title = feed.title.to_string();
+  podcast.description = piped_channel.description.clone();
+  podcast.last_build_date = feed.updated.to_rfc2822();
+  podcast.language = feed.lang.unwrap_or_default();
+  podcast.author = feed.authors.iter().map(|x| &x.name).join(", ");
+  podcast.logo_url = extra_info.logo_url;
+  podcast.categories = extra_info.tags;
+  podcast.channel_url = feed
     .links
     .first()
-    .cloned()
-    .map(|x| x.href)
-    .ok_or(Error::InvalidFeedEntry(entry.clone(), "no link found"))?;
+    .map(|x| x.href.clone())
+    .unwrap_or_default();
+
+  for entry in feed.entries.into_iter() {
+    podcast.episodes.push(make_episode(entry, &piped_channel)?);
+  }
+
+  Ok(podcast)
+}
+
+fn map_entry(entry: Entry) -> Result<rss::Item> {
+  // used for reporting error
+  let description = W(&entry).description()?;
+  let thumbnail = W(&entry).thumbnail()?;
+  let video_url = W(&entry).link()?;
+
   let audio_url = translate_video_to_audio_url(video_url.as_ref())?;
 
   let description_html = format!(
@@ -141,12 +129,12 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
           src=\"{}\" width=\"{}\" height=\"{}\"/>\n\
      <p>{}</p>\n\
      <p><a href=\"{}\">{}</a></p>\n",
-    media_thumbnail["url"],
-    media_thumbnail["width"],
-    media_thumbnail["height"],
-    media_description,
-    video_url,
-    video_url,
+    &thumbnail.url,
+    &thumbnail.width,
+    &thumbnail.height,
+    &description,
+    &video_url,
+    &video_url,
   );
 
   let enclosure = EnclosureBuilder::default()
@@ -155,9 +143,9 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
     .build();
 
   let itunes = ITunesItemExtensionBuilder::default()
-    .summary(Some((*media_description).clone()))
+    .summary(Some(description))
     .author(entry.authors.first().map(|x| x.name.clone()))
-    .image(Some(media_thumbnail["url"].clone()))
+    .image(Some(thumbnail.url.clone()))
     .build();
 
   let item = rss::Item {
@@ -175,6 +163,35 @@ fn map_entry(entry: Entry) -> Result<rss::Item> {
   };
 
   Ok(item)
+}
+
+fn make_episode(entry: Entry, piped_channel: &PipedChannel) -> Result<Episode> {
+  let mut episode = Episode::default();
+
+  let description = W(&entry).description()?;
+  let thumbnail = W(&entry).thumbnail()?;
+  let video_id = W(&entry).video_id()?;
+  let video_url = W(&entry).link()?;
+  let audio_url = translate_video_to_audio_url(video_url.as_ref())?;
+
+  episode.title = entry.title.to_string();
+  episode.link = video_url;
+  episode.description = description.to_string();
+  episode.pub_date = entry.updated.to_rfc2822();
+  episode.author = entry
+    .authors
+    .first()
+    .map(|x| x.name.clone())
+    .unwrap_or_default();
+  episode.guid = entry.id;
+  episode.thumbnail = thumbnail;
+  episode.audio_url = translate_video_to_audio_url(&episode.link)?;
+  episode.duration = piped_channel
+    .get_stream(&video_id)
+    .map(|x| x.duration)
+    .unwrap_or_default();
+
+  Ok(episode)
 }
 
 fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
@@ -276,6 +293,7 @@ struct ExtraInfo {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PipedChannel {
+  description: String,
   related_streams: Vec<PipedStream>,
 }
 #[derive(Debug, Deserialize)]
@@ -285,25 +303,34 @@ struct PipedStream {
   duration: u64,
 }
 
-async fn get_piped_channel(channel_id: &str) -> Result<PipedChannel> {
-  let url = format!("{PIPED_INSTANCE}/channel/{channel_id}");
-  let mut channel = reqwest::Client::new()
-    .get(&url)
-    .header("User-Agent", "Mozilla/5.0")
-    .send()
-    .await?
-    .json::<PipedChannel>()
-    .await?;
+impl PipedChannel {
+  async fn get(channel_id: &str) -> Result<PipedChannel> {
+    let url = format!("{PIPED_INSTANCE}/channel/{channel_id}");
+    let mut channel = reqwest::Client::new()
+      .get(&url)
+      .header("User-Agent", "Mozilla/5.0")
+      .send()
+      .await?
+      .json::<PipedChannel>()
+      .await?;
 
-  for stream in &mut channel.related_streams {
-    stream.video_id = stream
-      .video_id
-      .strip_prefix("/watch?v=")
-      .unwrap()
-      .to_string();
+    for stream in &mut channel.related_streams {
+      stream.video_id = stream
+        .video_id
+        .strip_prefix("/watch?v=")
+        .unwrap()
+        .to_string();
+    }
+
+    Ok(channel)
   }
 
-  Ok(channel)
+  fn get_stream(&self, video_id: &str) -> Option<&PipedStream> {
+    self
+      .related_streams
+      .iter()
+      .find(|stream| stream.video_id == video_id)
+  }
 }
 
 #[derive(serde::Deserialize)]
