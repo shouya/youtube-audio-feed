@@ -89,7 +89,7 @@ async fn make_episode(
   let thumbnail = W(&entry).thumbnail()?;
   let video_id = W(&entry).video_id()?;
   let video_url = W(&entry).link()?;
-  let audio_info = W(&entry).audio_info()?;
+  let audio_info = W(&entry).piped_audio_info().await?;
 
   episode.title = entry.title.to_string();
   episode.link = video_url;

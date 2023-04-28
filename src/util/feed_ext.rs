@@ -1,10 +1,11 @@
 use crate::INSTANCE_PUBLIC_URL;
 use atom_syndication::{extension::Extension, Entry};
 use http_types::Url;
+use serde_query::{DeserializeQuery, Query};
 
 use crate::{
   podcast::{AudioInfo, Thumbnail},
-  Error, Result, W,
+  Error, Result, PIPED_INSTANCE, W,
 };
 
 impl W<&Entry> {
@@ -104,8 +105,30 @@ impl W<&Entry> {
     Ok(AudioInfo { url, mime_type })
   }
 
-  async fn piped_audio_info(&self) -> Result<AudioInfo> {
-    todo!()
+  pub async fn piped_audio_info(&self) -> Result<AudioInfo> {
+    #[derive(Debug, DeserializeQuery)]
+    struct PipedStreamResp {
+      #[query(".audioStreams.[0].url")]
+      url: String,
+      #[query(".audioStreams.[0].mimeType")]
+      mime_type: String,
+    }
+
+    let video_id = self.video_id()?;
+    let piped_url = format!("{PIPED_INSTANCE}/streams/{video_id}");
+    let resp: PipedStreamResp = reqwest::Client::new()
+      .get(piped_url)
+      .header("User-Agent", "Mozilla/5.0")
+      .send()
+      .await?
+      .json::<Query<PipedStreamResp>>()
+      .await?
+      .into();
+
+    Ok(AudioInfo {
+      url: resp.url,
+      mime_type: resp.mime_type,
+    })
   }
 }
 
