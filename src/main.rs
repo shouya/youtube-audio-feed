@@ -30,6 +30,8 @@ async fn main() -> Result<()> {
     .route("/channel/:channel_id", get(feed::channel_podcast_xml))
     .route("/audio/:video_id", get(audio::get_audio));
 
+  println!("Listening on {}", INSTANCE_PUBLIC_URL);
+
   axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
     .serve(app.into_make_service())
     .await
