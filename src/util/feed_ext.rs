@@ -1,6 +1,11 @@
+use crate::INSTANCE_PUBLIC_URL;
 use atom_syndication::{extension::Extension, Entry};
+use http_types::Url;
 
-use crate::{podcast::Thumbnail, Error, Result, W};
+use crate::{
+  podcast::{AudioInfo, Thumbnail},
+  Error, Result, W,
+};
 
 impl W<&Entry> {
   fn media_group_children(&self, name: &str) -> Result<&Vec<Extension>> {
@@ -92,4 +97,26 @@ impl W<&Entry> {
       ))
       .map(|x| x.to_string())
   }
+
+  pub fn audio_info(&self) -> Result<AudioInfo> {
+    let url = translate_video_to_audio_url(&self.link()?)?;
+    let mime_type = "audio/mpeg".to_string();
+    Ok(AudioInfo { url, mime_type })
+  }
+
+  async fn piped_audio_info(&self) -> Result<AudioInfo> {
+    todo!()
+  }
+}
+
+fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
+  let uri: Url = uri_str.parse()?;
+  let video_id = uri
+    .query_pairs()
+    .find_map(|(k, v)| (k == "v").then_some(v))
+    .ok_or_else(|| {
+      Error::UnsupportedURL(uri_str.into(), "v parameter not found")
+    })?;
+
+  Ok(format!("{INSTANCE_PUBLIC_URL}/audio/{video_id}"))
 }

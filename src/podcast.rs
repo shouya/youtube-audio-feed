@@ -54,6 +54,12 @@ pub struct Thumbnail {
 }
 
 #[derive(Debug, Default)]
+pub struct AudioInfo {
+  pub url: String,
+  pub mime_type: String,
+}
+
+#[derive(Debug, Default)]
 pub struct Episode {
   pub title: String,
   pub link: String,
@@ -63,7 +69,7 @@ pub struct Episode {
   pub guid: String,
   pub duration: u64,
   pub thumbnail: Thumbnail,
-  pub audio_url: String,
+  pub audio_info: AudioInfo,
 }
 
 impl From<Episode> for rss::Item {
@@ -83,8 +89,8 @@ impl From<Episode> for rss::Item {
     );
 
     let enclosure = rss::EnclosureBuilder::default()
-      .url(episode.audio_url)
-      .mime_type("audio/mpeg".to_owned())
+      .url(episode.audio_info.url)
+      .mime_type(episode.audio_info.mime_type)
       .build();
 
     let itunes = rss::extension::itunes::ITunesItemExtensionBuilder::default()

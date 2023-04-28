@@ -81,6 +81,7 @@ fn make_episode(entry: Entry, piped_channel: &PipedChannel) -> Result<Episode> {
   let thumbnail = W(&entry).thumbnail()?;
   let video_id = W(&entry).video_id()?;
   let video_url = W(&entry).link()?;
+  let audio_info = W(&entry).audio_info()?;
 
   episode.title = entry.title.to_string();
   episode.link = video_url;
@@ -93,25 +94,14 @@ fn make_episode(entry: Entry, piped_channel: &PipedChannel) -> Result<Episode> {
     .unwrap_or_default();
   episode.guid = entry.id;
   episode.thumbnail = thumbnail;
-  episode.audio_url = translate_video_to_audio_url(&episode.link)?;
+  episode.audio_info = audio_info;
+
   episode.duration = piped_channel
     .get_stream(&video_id)
     .map(|x| x.duration)
     .unwrap_or_default();
 
   Ok(episode)
-}
-
-fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
-  let uri: Url = uri_str.parse()?;
-  let video_id = uri
-    .query_pairs()
-    .find_map(|(k, v)| (k == "v").then_some(v))
-    .ok_or_else(|| {
-      Error::UnsupportedURL(uri_str.into(), "v parameter not found")
-    })?;
-
-  Ok(format!("{INSTANCE_PUBLIC_URL}/audio/{video_id}"))
 }
 
 async fn get_feed(channel_id: &str) -> Result<Feed> {
