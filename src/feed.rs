@@ -9,6 +9,7 @@ use axum::{
   response::IntoResponse,
   TypedHeader,
 };
+use futures::future::try_join_all;
 use http_types::Url;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -30,7 +31,7 @@ pub async fn channel_podcast_xml(
     PipedChannel::get(&channel_id)
   )?;
 
-  let podcast = make_podcast(feed, extra_info, piped_channel)?;
+  let podcast = make_podcast(feed, extra_info, piped_channel).await?;
   let podcast_channel: rss::Channel = podcast.into();
 
   let mut output = Vec::new();
@@ -44,7 +45,7 @@ pub async fn channel_podcast_xml(
   Ok(resp)
 }
 
-fn make_podcast(
+async fn make_podcast(
   feed: Feed,
   extra_info: ExtraInfo,
   piped_channel: PipedChannel,
@@ -67,14 +68,21 @@ fn make_podcast(
     ..Default::default()
   };
 
-  for entry in feed.entries.into_iter() {
-    podcast.episodes.push(make_episode(entry, &piped_channel)?);
-  }
+  let episodes_fut = feed
+    .entries
+    .into_iter()
+    .map(|entry| make_episode(entry, &piped_channel));
+
+  let episodes = try_join_all(episodes_fut).await?;
+  podcast.episodes = episodes;
 
   Ok(podcast)
 }
 
-fn make_episode(entry: Entry, piped_channel: &PipedChannel) -> Result<Episode> {
+async fn make_episode(
+  entry: Entry,
+  piped_channel: &PipedChannel,
+) -> Result<Episode> {
   let mut episode = Episode::default();
 
   let description = W(&entry).description()?;
