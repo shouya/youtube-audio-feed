@@ -43,15 +43,12 @@ impl W<&Entry> {
   }
 
   pub fn description(&self) -> Result<String> {
-    self
+    let desc = self
       .media_group_child("description")?
       .value
       .as_ref()
-      .ok_or(Error::InvalidFeedEntry(
-        self.0.clone(),
-        "invalid description attribute",
-      ))
-      .map(|x| x.to_string())
+      .map(|x| x.to_string());
+    Ok(desc.unwrap_or_default())
   }
 
   pub fn thumbnail(&self) -> Result<Thumbnail> {
