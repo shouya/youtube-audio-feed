@@ -76,7 +76,11 @@ async fn make_podcast(
     .into_iter()
     .map(|entry| make_episode(entry, piped_instance, &piped_channel));
 
-  let episodes = try_join_all(episodes_fut).await?;
+  let episodes = try_join_all(episodes_fut)
+    .await?
+    .into_iter()
+    .flatten()
+    .collect();
   podcast.episodes = episodes;
 
   Ok(podcast)
@@ -86,12 +90,21 @@ async fn make_episode(
   entry: Entry,
   piped_instance: &PipedInstance,
   piped_channel: &PipedChannel,
-) -> Result<Episode> {
+) -> Result<Option<Episode>> {
   let mut episode = Episode::default();
 
   let description = W(&entry).description()?;
   let thumbnail = W(&entry).thumbnail()?;
   let video_id = W(&entry).video_id()?;
+
+  let Some(piped_stream) = piped_channel.get_stream(&video_id) else {
+    return Ok(None);
+  };
+
+  if piped_stream.is_short {
+    return Ok(None);
+  }
+
   let video_url = W(&entry).link()?;
   let audio_info = W(&entry).piped_audio_info(piped_instance).await?;
 
@@ -108,12 +121,9 @@ async fn make_episode(
   episode.thumbnail = thumbnail;
   episode.audio_info = audio_info;
 
-  episode.duration = piped_channel
-    .get_stream(&video_id)
-    .map(|x| x.duration)
-    .unwrap_or_default();
+  episode.duration = piped_stream.duration;
 
-  Ok(episode)
+  Ok(Some(episode))
 }
 
 async fn get_feed(channel_id: &str) -> Result<Feed> {
@@ -211,6 +221,8 @@ struct PipedStream {
   #[serde(rename = "url")]
   video_id: String,
   duration: u64,
+  #[serde(rename = "isShort")]
+  is_short: bool,
 }
 
 impl PipedChannel {
