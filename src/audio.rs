@@ -6,14 +6,16 @@ use axum::{
 use reqwest::header;
 use serde_query::{DeserializeQuery, Query};
 
-use crate::{Result, PIPED_INSTANCE};
+use crate::piped::PipedInstance;
+use crate::Result;
 
 #[axum::debug_handler]
 pub async fn get_audio(
   Path(video_id): Path<String>,
+  piped: PipedInstance,
   headers: HeaderMap,
 ) -> Result<impl IntoResponse> {
-  let playable_link = get_playable_link(&video_id).await?;
+  let playable_link = get_playable_link(&video_id, &piped).await?;
   proxy_play_link(&playable_link, headers).await
 }
 
@@ -39,8 +41,11 @@ struct PipedStreamResp {
   url: String,
 }
 
-async fn get_playable_link(video_id: &str) -> Result<String> {
-  let piped_url = format!("{PIPED_INSTANCE}/streams/{video_id}");
+async fn get_playable_link(
+  video_id: &str,
+  piped: &PipedInstance,
+) -> Result<String> {
+  let piped_url = piped.stream_url(video_id);
   let resp: PipedStreamResp = reqwest::Client::new()
     .get(piped_url)
     .header("User-Agent", "Mozilla/5.0")

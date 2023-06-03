@@ -1,11 +1,11 @@
-use crate::INSTANCE_PUBLIC_URL;
+use crate::{piped::PipedInstance, INSTANCE_PUBLIC_URL};
 use atom_syndication::{extension::Extension, Entry};
 use http_types::Url;
 use serde_query::{DeserializeQuery, Query};
 
 use crate::{
   podcast::{AudioInfo, Thumbnail},
-  Error, Result, PIPED_INSTANCE, W,
+  Error, Result, W,
 };
 
 impl W<&Entry> {
@@ -102,7 +102,10 @@ impl W<&Entry> {
     Ok(AudioInfo { url, mime_type })
   }
 
-  pub async fn piped_audio_info(&self) -> Result<AudioInfo> {
+  pub async fn piped_audio_info(
+    &self,
+    piped: &PipedInstance,
+  ) -> Result<AudioInfo> {
     #[derive(Debug, DeserializeQuery)]
     struct PipedStreamResp {
       #[query(".audioStreams.[0].url")]
@@ -112,7 +115,7 @@ impl W<&Entry> {
     }
 
     let video_id = self.video_id()?;
-    let piped_url = format!("{PIPED_INSTANCE}/streams/{video_id}");
+    let piped_url = piped.stream_url(&video_id);
     let resp: PipedStreamResp = reqwest::Client::new()
       .get(piped_url)
       .header("User-Agent", "Mozilla/5.0")

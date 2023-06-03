@@ -18,20 +18,22 @@ use reqwest::{header, StatusCode};
 use serde::Deserialize;
 
 use crate::{
+  piped::PipedInstance,
   podcast::{Episode, Podcast},
-  Error, Result, INSTANCE_PUBLIC_URL, PIPED_INSTANCE, W,
+  Error, Result, INSTANCE_PUBLIC_URL, W,
 };
 
 pub async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
+  piped: PipedInstance,
 ) -> Result<impl IntoResponse> {
   let (feed, extra_info, piped_channel) = tokio::try_join!(
     get_feed(&channel_id),
     get_extra_info(&channel_id),
-    PipedChannel::get(&channel_id)
+    PipedChannel::get(&channel_id, &piped)
   )?;
 
-  let podcast = make_podcast(feed, extra_info, piped_channel).await?;
+  let podcast = make_podcast(feed, extra_info, &piped, piped_channel).await?;
   let podcast_channel: rss::Channel = podcast.into();
 
   let mut output = Vec::new();
@@ -48,6 +50,7 @@ pub async fn channel_podcast_xml(
 async fn make_podcast(
   feed: Feed,
   extra_info: ExtraInfo,
+  piped_instance: &PipedInstance,
   piped_channel: PipedChannel,
 ) -> Result<Podcast> {
   let channel_url = feed
@@ -71,7 +74,7 @@ async fn make_podcast(
   let episodes_fut = feed
     .entries
     .into_iter()
-    .map(|entry| make_episode(entry, &piped_channel));
+    .map(|entry| make_episode(entry, piped_instance, &piped_channel));
 
   let episodes = try_join_all(episodes_fut).await?;
   podcast.episodes = episodes;
@@ -81,6 +84,7 @@ async fn make_podcast(
 
 async fn make_episode(
   entry: Entry,
+  piped_instance: &PipedInstance,
   piped_channel: &PipedChannel,
 ) -> Result<Episode> {
   let mut episode = Episode::default();
@@ -89,7 +93,7 @@ async fn make_episode(
   let thumbnail = W(&entry).thumbnail()?;
   let video_id = W(&entry).video_id()?;
   let video_url = W(&entry).link()?;
-  let audio_info = W(&entry).piped_audio_info().await?;
+  let audio_info = W(&entry).piped_audio_info(piped_instance).await?;
 
   episode.title = entry.title.to_string();
   episode.link = video_url;
@@ -210,8 +214,11 @@ struct PipedStream {
 }
 
 impl PipedChannel {
-  async fn get(channel_id: &str) -> Result<PipedChannel> {
-    let url = format!("{PIPED_INSTANCE}/channel/{channel_id}");
+  async fn get(
+    channel_id: &str,
+    piped: &PipedInstance,
+  ) -> Result<PipedChannel> {
+    let url = piped.channel_url(channel_id);
     let mut channel = reqwest::Client::new()
       .get(&url)
       .header("User-Agent", "Mozilla/5.0")
