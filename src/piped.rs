@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
-const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.kavin.rocks";
+const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.tokhmi.xyz";
 
 static GLOBAL_PIPED_INSTANCE: Lazy<Mutex<PipedInstance>> =
   Lazy::new(|| Mutex::new(PipedInstance::default()));
@@ -88,7 +88,7 @@ impl PipedInstanceRepo {
     const START_MARKER: &str = "--- | --- | --- | ---";
     let interesting_lines = markdown
       .lines()
-      .skip_while(|line| !line.starts_with(START_MARKER))
+      .skip_while(|line| !line.trim().starts_with(START_MARKER))
       .skip(1);
 
     for line in interesting_lines {
