@@ -1,64 +1,56 @@
+use std::str::FromStr;
+
 use axum::body::StreamBody;
-use axum::response::Redirect;
 use axum::{
   body, extract::Path, headers::HeaderMap, http::Response,
   response::IntoResponse,
 };
+use http::HeaderName;
 use reqwest::header;
-use serde_query::{DeserializeQuery, Query};
 
+use crate::extractor::{self, Extraction, YoutubeAudioExtractor};
 use crate::piped::PipedInstance;
-use crate::Result;
+use crate::{Error, Result};
 
 #[axum::debug_handler]
 pub async fn get_audio(
   Path(video_id): Path<String>,
   piped: PipedInstance,
-  _headers: HeaderMap,
+  headers: HeaderMap,
 ) -> Result<impl IntoResponse> {
-  let playable_link = get_playable_link(&video_id, &piped).await?;
-  Ok(Redirect::temporary(&playable_link))
+  #[allow_unused)]
+  let piped_extractor = extractor::Piped(&piped);
+  #[allow_unused)]
+  let rustube_extractor = extractor::Rustube;
 
-  // proxy_play_link(&playable_link, headers).await
+  let extractor = rustube_extractor;
+
+  let extraction = extractor.extract(&video_id).await?;
+
+  // Ok(Redirect::temporary(&playable_link))
+
+  proxy_play_link(extraction, headers).await
 }
 
 async fn proxy_play_link(
-  url: &str,
+  extraction: Extraction,
   mut headers: HeaderMap,
 ) -> Result<impl IntoResponse> {
   headers.remove(header::HOST);
+  for (key, value) in extraction.headers.iter() {
+    let key = HeaderName::from_str(key).map_err(|_e| Error::Extraction)?;
+    let value =
+      header::HeaderValue::from_str(value).map_err(|_e| Error::Extraction)?;
+    headers.insert(key, value);
+  }
 
   let resp = reqwest::Client::new()
-    .get(url)
+    .get(extraction.url)
     .headers(headers)
     .send()
     .await?;
 
   Ok(StreamResponse(resp))
-}
-
-// https://docs.piped.video/docs/api-documentation/
-#[derive(DeserializeQuery)]
-struct PipedStreamResp {
-  #[query(".audioStreams.[0].url")]
-  url: String,
-}
-
-async fn get_playable_link(
-  video_id: &str,
-  piped: &PipedInstance,
-) -> Result<String> {
-  let piped_url = piped.stream_url(video_id);
-  let resp: PipedStreamResp = reqwest::Client::new()
-    .get(piped_url)
-    .header("User-Agent", "Mozilla/5.0")
-    .send()
-    .await?
-    .json::<Query<PipedStreamResp>>()
-    .await?
-    .into();
-
-  Ok(resp.url)
 }
 
 struct StreamResponse(reqwest::Response);

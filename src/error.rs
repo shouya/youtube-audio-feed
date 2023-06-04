@@ -28,6 +28,12 @@ pub enum Error {
   IO(#[from] std::io::Error),
   #[error("request invidious error: {0}")]
   Invidious(&'static str),
+  #[error("unable to get audio stream: {0}")]
+  AudioStream(String),
+  #[error("rustube error: {0}")]
+  Rustube(#[from] rustube::Error),
+  #[error("extraction error")]
+  Extraction,
 }
 
 impl IntoResponse for Error {

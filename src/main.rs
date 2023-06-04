@@ -5,6 +5,7 @@ use axum::{
 
 mod audio;
 mod error;
+mod extractor;
 mod feed;
 mod piped;
 mod podcast;
