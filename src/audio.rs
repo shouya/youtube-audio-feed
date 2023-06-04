@@ -18,9 +18,9 @@ pub async fn get_audio(
   piped: PipedInstance,
   headers: HeaderMap,
 ) -> Result<impl IntoResponse> {
-  #[allow_unused)]
+  #[allow(unused)]
   let piped_extractor = extractor::Piped(&piped);
-  #[allow_unused)]
+  #[allow(unused)]
   let rustube_extractor = extractor::Rustube;
 
   let extractor = rustube_extractor;

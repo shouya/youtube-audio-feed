@@ -48,10 +48,10 @@ pub struct Rustube;
 #[async_trait]
 impl YoutubeAudioExtractor for Rustube {
   async fn extract(&self, video_id: &str) -> Result<Extraction, Error> {
-    use rustube::{Id, Video};
+    use rustube::{Id, VideoFetcher};
 
     let id = Id::from_str(video_id)?.as_owned();
-    let video = Video::from_id(id).await?;
+    let video = VideoFetcher::from_id(id)?.fetch().await?.descramble()?;
     let stream = video
       .best_audio()
       .ok_or_else(|| Error::AudioStream(video_id.into()))?;
