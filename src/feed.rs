@@ -19,7 +19,7 @@ use serde::Deserialize;
 
 use crate::{
   piped::PipedInstance,
-  podcast::{Episode, Podcast},
+  podcast::{AudioInfo, Episode, Podcast},
   Error, Result, INSTANCE_PUBLIC_URL, W,
 };
 
@@ -88,7 +88,7 @@ async fn make_podcast(
 
 async fn make_episode(
   entry: Entry,
-  piped_instance: &PipedInstance,
+  _piped_instance: &PipedInstance,
   piped_channel: &PipedChannel,
 ) -> Result<Option<Episode>> {
   let mut episode = Episode::default();
@@ -106,7 +106,10 @@ async fn make_episode(
   }
 
   let video_url = W(&entry).link()?;
-  let audio_info = W(&entry).piped_audio_info(piped_instance).await?;
+  let audio_info = AudioInfo {
+    url: format!("{}/audio/{}", INSTANCE_PUBLIC_URL, video_id),
+    mime_type: "audio/mpeg".to_string(),
+  };
 
   episode.title = entry.title.to_string();
   episode.link = video_url;

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::{convert::Infallible, sync::Mutex};
 
 use async_trait::async_trait;
@@ -6,7 +7,7 @@ use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
-const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.tokhmi.xyz";
+const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.aeong.one";
 
 static GLOBAL_PIPED_INSTANCE: Lazy<Mutex<PipedInstance>> =
   Lazy::new(|| Mutex::new(PipedInstance::default()));

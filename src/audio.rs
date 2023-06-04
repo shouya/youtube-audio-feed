@@ -1,4 +1,5 @@
 use axum::body::StreamBody;
+use axum::response::Redirect;
 use axum::{
   body, extract::Path, headers::HeaderMap, http::Response,
   response::IntoResponse,
@@ -13,10 +14,12 @@ use crate::Result;
 pub async fn get_audio(
   Path(video_id): Path<String>,
   piped: PipedInstance,
-  headers: HeaderMap,
+  _headers: HeaderMap,
 ) -> Result<impl IntoResponse> {
   let playable_link = get_playable_link(&video_id, &piped).await?;
-  proxy_play_link(&playable_link, headers).await
+  Ok(Redirect::temporary(&playable_link))
+
+  // proxy_play_link(&playable_link, headers).await
 }
 
 async fn proxy_play_link(
