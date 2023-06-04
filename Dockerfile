@@ -15,7 +15,9 @@ RUN --mount=type=cache,target=/workdir/target \
 
 # RUN cargo build --release --target=x86_64-unknown-linux-musl
 
-FROM docker.io/library/alpine:latest AS RUNNER
+FROM docker.io/library/alpine:edge AS RUNNER
+
+RUN apk add --no-cache yt-dlp
 
 COPY --from=BUILDER \
     /workdir/youtube_audio_feed \

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 podman build -t youtube-audio-feed .
 podman push --format v2s2 youtube-audio-feed \

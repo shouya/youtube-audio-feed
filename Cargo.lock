@@ -1793,8 +1793,7 @@ dependencies = [
 [[package]]
 name = "rustube"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54eb7d24b3ef2e468826cb9b2ecca98a55169007ba416891a67c8b159a23b48f"
+source = "git+https://github.com/Discursif/rustube.git#6b676ca30a2c9bfe089718b79ec4b51573a669c6"
 dependencies = [
  "bytes",
  "cfg-if",
@@ -2018,6 +2017,15 @@ dependencies = [
  "cpufeatures",
  "digest 0.9.0",
  "opaque-debug",
+]
+
+[[package]]
+name = "signal-hook-registry"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -2277,6 +2285,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.48.0",
@@ -2776,6 +2785,7 @@ dependencies = [
  "rustube",
  "serde",
  "serde-query",
+ "serde_json",
  "thiserror",
  "tl",
  "tokio",
