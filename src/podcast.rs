@@ -15,7 +15,7 @@ pub struct Podcast {
 
 impl From<Podcast> for rss::Channel {
   fn from(podcast: Podcast) -> Self {
-    let itunes_categoris = podcast.categories.into_iter().map(|c| {
+   let itunes_categoris = podcast.categories.into_iter().map(|c| {
       rss::extension::itunes::ITunesCategoryBuilder::default()
         .text(c)
         .build()

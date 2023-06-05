@@ -7,6 +7,7 @@ mod audio;
 mod error;
 mod extractor;
 mod feed;
+mod harvestor;
 mod piped;
 mod podcast;
 mod util;
