@@ -31,9 +31,9 @@ impl RssPiped {
 impl Harvestor for RssPiped {
   async fn harvest(&self, channel_id: &str) -> Result<Podcast> {
     let (feed, extra_info, piped_channel) = tokio::try_join!(
-      get_feed(&channel_id),
-      get_extra_info(&channel_id),
-      PipedChannel::get(&channel_id, &self.piped)
+      get_feed(channel_id),
+      get_extra_info(channel_id),
+      PipedChannel::get(channel_id, &self.piped)
     )?;
 
     let podcast = make_podcast(feed, extra_info, piped_channel).await?;
