@@ -9,6 +9,7 @@ edition = "2021"
 async-trait = "0.1.68"
 atom_syndication = "0.12.1"
 axum = { version = "0.6.18", features = ["macros", "headers"] }
+chrono = "0.4.26"
 futures = "0.3.28"
 http = "0.2.9"
 http-types = "2.12.0"
@@ -28,3 +29,4 @@ thiserror = "1.0.40"
 # tl = { version = "0.7.6", features = ["simd"] }
 tl = { version = "0.7.6" }
 tokio = { version = "1.20.1", features = ["macros", "process"] }
+ytextract = "0.11.2"

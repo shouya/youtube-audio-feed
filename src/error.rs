@@ -34,12 +34,18 @@ pub enum Error {
   Rustube(#[from] rustube::Error),
   #[error("extraction error")]
   Extraction,
+  #[error("invalid id: {0}")]
+  InvalidId(String),
+  #[error("ytextract error: {0}")]
+  Ytextract(#[from] ytextract::Error),
 }
 
 impl IntoResponse for Error {
   fn into_response(self) -> Response {
     use http::StatusCode;
     use Error::*;
+
+    eprintln!("error: {}", self);
 
     let code = match &self {
       RequestUpstream(e) => e.status().unwrap_or(StatusCode::BAD_REQUEST),

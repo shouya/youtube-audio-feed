@@ -10,6 +10,7 @@ mod feed;
 mod harvestor;
 mod piped;
 mod podcast;
+mod rss;
 mod util;
 
 pub use error::{Error, Result};
