@@ -1,41 +1,32 @@
 use std::str::FromStr;
 
 use axum::body::StreamBody;
-use axum::extract::Query;
 use axum::{
   body, extract::Path, headers::HeaderMap, http::Response,
   response::IntoResponse,
 };
 use http::HeaderName;
 use reqwest::header;
-use serde::Deserialize;
 
 use crate::extractor::{self, Extraction, Extractor};
 use crate::piped::PipedInstance;
+use crate::util::race_ordered_first_ok;
 use crate::{Error, Result};
-
-#[derive(Debug, Deserialize)]
-pub struct ExtractorQuery {
-  #[serde(default)]
-  pub extractor: String,
-}
 
 #[axum::debug_handler]
 pub async fn get_audio(
   Path(video_id): Path<String>,
-  Query(extractor): Query<ExtractorQuery>,
   piped: PipedInstance,
   headers: HeaderMap,
 ) -> Result<impl IntoResponse> {
-  let extractor: Box<dyn Extractor + Send + Sync> =
-    match extractor.extractor.as_str() {
-      "piped" => Box::new(extractor::Piped(&piped)),
-      "rustube" => Box::new(extractor::Rustube),
-      "yt-dlp" => Box::new(extractor::Ytdlp),
-      _ => Box::new(extractor::Ytdlp),
-    };
+  let piped_extractor = extractor::Piped(&piped);
+  let extractions: Vec<_> = vec![
+    extractor::Ytdlp.extract(&video_id),
+    extractor::Rustube.extract(&video_id),
+    piped_extractor.extract(&video_id),
+  ];
 
-  let extraction = extractor.extract(&video_id).await?;
+  let extraction = race_ordered_first_ok(extractions).await?;
 
   // Ok(Redirect::temporary(&playable_link))
 
