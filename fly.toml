@@ -1,6 +1,10 @@
 # fly.toml file generated for youtube-audio-feed on 2022-08-17T23:41:14+08:00
 
 app = "youtube-audio-feed"
+# Tokyo
+primary_region = "nrt"
+# yt-dlp sometimes uses excessive memory, so we should setup a swap
+swap_size_mb = 512
 kill_signal = "SIGINT"
 kill_timeout = 5
 processes = []
@@ -12,7 +16,6 @@ processes = []
   auto_rollback = true
 
 [[services]]
-  http_checks = []
   internal_port = 8080
   processes = ["app"]
   protocol = "tcp"
@@ -31,11 +34,21 @@ processes = []
     handlers = ["tls", "http"]
     port = 443
 
-  [[services.tcp_checks]]
+  [[services.http_checks]]
+    protocol = "http"
+    interval = "5s"
+    timeout = "5s"
     grace_period = "1s"
-    interval = "15s"
-    restart_limit = 0
-    timeout = "2s"
+    method = "get"
+    path = "/health"
+
+  [[services.http_checks]]
+    protocol = "http"
+    interval = "300s"
+    timeout = "60s"
+    grace_period = "1s"
+    method = "get"
+    path = "/channel/UC1yNl2E66ZzKApQdRuTQ4tw"
 
 [build]
   image = "registry.fly.io/youtube-audio-feed:latest"
