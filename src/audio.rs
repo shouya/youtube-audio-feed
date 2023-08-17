@@ -47,6 +47,7 @@ async fn proxy_play_link(
 
   let resp = reqwest::Client::new()
     .get(extraction.url)
+    .header("Range", "bytes=0-")
     .headers(headers)
     .send()
     .await?;
