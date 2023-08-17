@@ -7,6 +7,8 @@ use axum::{
   TypedHeader,
 };
 use http_types::Url;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use reqwest::{header, StatusCode};
 
 use crate::{
@@ -41,18 +43,25 @@ pub struct GetPodcastReq {
 pub async fn channel_podcast_url(
   Query(req): Query<GetPodcastReq>,
 ) -> Result<impl IntoResponse> {
-  let channel_id = match extract_youtube_channel_name(&req.url)? {
-    ChannelIdentifier::Id(id) => id,
-    ChannelIdentifier::Name(name) => find_youtube_channel_id(&name).await?,
-  };
+  let channel_ref = extract_youtube_channel_ref(&req.url)?;
+  let channel_id = find_youtube_channel_id(channel_ref).await?;
   let podcast_url = format!("{INSTANCE_PUBLIC_URL}/channel/{channel_id}");
   let content_type = TypedHeader(ContentType::text());
 
   Ok((content_type, podcast_url))
 }
 
-async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
-  let url = format!("https://www.youtube.com/c/{channel_name}");
+async fn find_youtube_channel_id(channel_ref: ChannelRef) -> Result<String> {
+  let url = match channel_ref {
+    ChannelRef::Name(name) => {
+      format!("https://www.youtube.com/c/{name}")
+    }
+    ChannelRef::Handle(handle) => {
+      format!("https://www.youtube.com/@{handle}")
+    }
+    ChannelRef::Id(id) => return Ok(id),
+  };
+
   let resp = reqwest::get(url).await?;
 
   let resp_body = resp.text().await?;
@@ -82,34 +91,44 @@ async fn find_youtube_channel_id(channel_name: &str) -> Result<String> {
   Ok(channel_id.to_string())
 }
 
-enum ChannelIdentifier {
+enum ChannelRef {
   Id(String),
+  // https://www.youtube.com/c/SciShow
   Name(String),
+  // https://www.youtube.com/@ComplexityExplorer
+  Handle(String),
 }
 
-fn extract_youtube_channel_name(url: &str) -> Result<ChannelIdentifier> {
+fn extract_youtube_channel_ref(url: &str) -> Result<ChannelRef> {
+  static ID_REGEX: Lazy<Regex> =
+    Lazy::new(|| regex::Regex::new(r"^channel/([a-zA-Z0-9_]+)").unwrap());
+  static NAME_REGEX: Lazy<Regex> =
+    Lazy::new(|| regex::Regex::new(r"^c/([a-zA-Z0-9_]+)").unwrap());
+  static HANDLE_REGEX: Lazy<Regex> =
+    Lazy::new(|| regex::Regex::new(r"^@([a-zA-Z0-9_]+)$").unwrap());
+
   let url: Url = url.parse()?;
 
   match url.host_str() {
     Some("www.youtube.com") | Some("m.youtube.com") => (),
-    _ => return Err(Error::UnsupportedURL(url.into(), "not youtube")),
+    _ => return Err(Error::UnsupportedURL(url.into(), "not youtube domain")),
   }
 
-  if let Some(segments) = url.path_segments() {
-    let segs: Vec<_> = segments.take(3).collect();
-    if segs.len() < 2 {
-      return Err(Error::UnsupportedURL(url.into(), "video path not found"));
-    }
+  let path = url.path().strip_prefix('/').unwrap_or("");
 
-    let id = match segs[0] {
-      "c" => ChannelIdentifier::Name(segs[1].to_string()),
-      "channel" => ChannelIdentifier::Id(segs[1].to_string()),
-      _ => {
-        return Err(Error::UnsupportedURL(url.into(), "video path not found"))
-      }
-    };
+  if let Some(captures) = ID_REGEX.captures(path) {
+    let id = captures.get(1).unwrap().as_str().to_string();
+    return Ok(ChannelRef::Id(id));
+  }
 
-    return Ok(id);
+  if let Some(captures) = NAME_REGEX.captures(path) {
+    let name = captures.get(1).unwrap().as_str().to_string();
+    return Ok(ChannelRef::Name(name));
+  }
+
+  if let Some(captures) = HANDLE_REGEX.captures(path) {
+    let handle = captures.get(1).unwrap().as_str().to_string();
+    return Ok(ChannelRef::Handle(handle));
   }
 
   Err(Error::UnsupportedURL(url.into(), "invalid youtube url"))

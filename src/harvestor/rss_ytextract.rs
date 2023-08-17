@@ -150,6 +150,8 @@ fn make_podcast(
 
 #[cfg(test)]
 mod test {
+  use ytextract::Client;
+
   #[tokio::test]
   async fn test_harvest() {
     let client = Client::new();
