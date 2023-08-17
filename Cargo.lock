@@ -2884,11 +2884,10 @@ dependencies = [
 [[package]]
 name = "ytextract"
 version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05fa23ed8e30fd11f0be289657a7f96d7b307704142ea921e56a4bb93debb39f"
+source = "git+https://github.com/Azorlogh/ytextract.git#791aa422fb87160d107aa11b9ab81dae18b7002b"
 dependencies = [
  "async-stream",
- "base64 0.13.1",
+ "base64 0.21.0",
  "bytes",
  "chrono",
  "futures-core",

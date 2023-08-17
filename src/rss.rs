@@ -5,6 +5,7 @@ use itertools::Itertools;
 
 use crate::{podcast::Thumbnail, Result, W};
 
+#[derive(Debug)]
 pub struct RssChannel {
   pub title: String,
   pub updated: String,
@@ -14,6 +15,7 @@ pub struct RssChannel {
   pub episodes: Vec<RssEpisode>,
 }
 
+#[derive(Debug)]
 pub struct RssEpisode {
   pub video_id: String,
   pub title: String,
