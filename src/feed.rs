@@ -6,6 +6,7 @@ use axum::{
   response::IntoResponse,
   TypedHeader,
 };
+use futures::future::select_ok;
 use http_types::Url;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -20,8 +21,12 @@ pub async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
   piped: PipedInstance,
 ) -> Result<impl IntoResponse> {
-  let podcast = harvestor::RssYtextract::new().harvest(&channel_id).await?;
-  let _podcast = harvestor::RssPiped::new(piped).harvest(&channel_id).await?;
+  let (podcast, _) = select_ok([
+    harvestor::RssYtextract::new().harvest(&channel_id),
+    harvestor::RssPiped::new(piped).harvest(&channel_id),
+  ])
+  .await?;
+
   let podcast_channel: rss::Channel = podcast.into();
 
   let mut output = Vec::new();

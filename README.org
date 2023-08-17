@@ -6,4 +6,22 @@ Public instance: https://youtube-audio-feed.fly.dev
 
 Example feed: https://youtube-audio-feed.fly.dev/channel/UCZYTClx2T1of7BRZ86-8fow (SciShow)
 
-The data is based on [[https://docs.piped.video/docs/api-documentation/][Piped API]] which does all the heavy lifting.
+* Architecture
+
+The two major components are:
+
+- harvestor: harvest the latest videos from channel
+- extractor: extract the audio from a video id
+
+Here are the implemented harvestors:
+
+- ytextract (https://github.com/Azorlogh/ytextract)
+- piped (https://github.com/TeamPiped/Piped/wiki/Instances)
+
+Here are the implemented extractors:
+
+- piped
+- ytdlp (https://github.com/yt-dlp/yt-dlp)
+- rustube (https://github.com/DzenanJupic/rustube)
+
+Currently, it will automatically pick the first successful extractor and harvestor.
