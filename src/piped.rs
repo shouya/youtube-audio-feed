@@ -147,6 +147,5 @@ mod tests {
     let instances = repo.pull_latest().await;
     println!("{:#?}", &instances);
     assert!(!instances.is_empty());
-    assert!(false);
   }
 }

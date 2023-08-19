@@ -1,6 +1,9 @@
 use futures::Future;
 
+mod byte_stream;
 mod feed_ext;
+
+pub use byte_stream::ByteStream;
 
 #[derive(Default)]
 pub struct W<T>(pub T);

@@ -19,9 +19,9 @@ impl Extractor for Rustube {
     let url = stream.signature_cipher.url.to_string();
     let url = format!("{}&range=0-999999999999", url);
 
-    Ok(Extraction {
+    Ok(Extraction::Proxy {
       url,
-      ..Default::default()
+      headers: vec![],
     })
   }
 }

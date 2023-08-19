@@ -51,6 +51,6 @@ impl Extractor for Ytdlp {
     let url = format.url.clone();
     let headers = format.http_headers.into_iter().collect();
 
-    Ok(Extraction { url, headers })
+    Ok(Extraction::Proxy { url, headers })
   }
 }

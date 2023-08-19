@@ -27,9 +27,9 @@ impl<'a> Extractor for Piped<'a> {
       .await?
       .into();
 
-    Ok(Extraction {
+    Ok(Extraction::Proxy {
       url: resp.url,
-      ..Default::default()
+      headers: vec![],
     })
   }
 }

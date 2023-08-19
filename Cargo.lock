@@ -2861,6 +2861,7 @@ dependencies = [
  "async-trait",
  "atom_syndication",
  "axum",
+ "bytes",
  "chrono",
  "futures",
  "http",
