@@ -38,6 +38,8 @@ pub enum Error {
   InvalidId(String),
   #[error("ytextract error: {0}")]
   Ytextract(#[from] ytextract::Error),
+  #[error("invalid header: {0}")]
+  InvalidHeader(#[from] http::header::InvalidHeaderValue),
 }
 
 impl IntoResponse for Error {

@@ -30,4 +30,5 @@ thiserror = "1.0.40"
 # tl = { version = "0.7.6", features = ["simd"] }
 tl = { version = "0.7.6" }
 tokio = { version = "1.20.1", features = ["macros", "process"] }
+tokio-util = "0.7.8"
 ytextract = { git = "https://github.com/Azorlogh/ytextract.git" }

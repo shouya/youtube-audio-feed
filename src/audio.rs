@@ -6,7 +6,7 @@ use axum::{
   response::IntoResponse,
 };
 use futures::stream::BoxStream;
-use http::HeaderName;
+use http::{HeaderName, HeaderValue};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::header;
@@ -76,10 +76,11 @@ async fn proxy_stream(
   let range = req_headers
     .get(header::RANGE)
     .and_then(|range| range.to_str().ok());
+  let range = parse_range(range);
 
   let stream = ByteStream::new(stream);
 
-  let stream = match parse_range(range) {
+  let stream = match range {
     (Some(start), Some(end)) => {
       let stream = stream.skip_bytes(start).limit_bytes(end - start + 1);
       StreamBody::new(stream)
@@ -95,7 +96,25 @@ async fn proxy_stream(
     (_, _) => StreamBody::new(stream),
   };
 
-  Ok(stream)
+  let mut headers = HeaderMap::new();
+  headers.insert(header::CONTENT_TYPE, HeaderValue::from_str(&mime_type)?);
+  if let Some(content_range) = to_content_range(range) {
+    headers.insert(
+      header::CONTENT_RANGE,
+      HeaderValue::from_str(&content_range)?,
+    );
+  }
+
+  Ok((headers, stream))
+}
+
+fn to_content_range(range: (Option<usize>, Option<usize>)) -> Option<String> {
+  match range {
+    (Some(start), Some(end)) => Some(format!("bytes {}-{}/*", start, end)),
+    (Some(start), None) => Some(format!("bytes {}-*/?", start)),
+    (None, Some(end)) => Some(format!("bytes */{}", end + 1)),
+    (_, _) => None,
+  }
 }
 
 async fn proxy_play_link(

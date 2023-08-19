@@ -6,7 +6,7 @@ use crate::{Error, Result};
 
 use super::{Extraction, Extractor};
 
-// run yt-dlp command line to get video playback url.
+// run yt-dlp command line to get audio playback url.
 // requires yt-dlp executable to be in PATH.
 pub struct Ytdlp;
 

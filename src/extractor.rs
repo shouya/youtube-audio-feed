@@ -1,6 +1,7 @@
 mod piped;
 mod rustube;
 mod ytdlp;
+mod ytdlp_stream;
 
 use async_trait::async_trait;
 use axum::body::Bytes;

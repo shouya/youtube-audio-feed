@@ -2879,6 +2879,7 @@ dependencies = [
  "thiserror",
  "tl",
  "tokio",
+ "tokio-util",
  "ytextract",
 ]
 
