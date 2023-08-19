@@ -24,7 +24,7 @@ pub async fn get_audio(
 ) -> Result<impl IntoResponse> {
   let piped_extractor = extractor::Piped(&piped);
   let extractions: Vec<_> = vec![
-    extractor::Ytdlp.extract(&video_id),
+    extractor::YtdlpStream.extract(&video_id),
     extractor::Rustube.extract(&video_id),
     piped_extractor.extract(&video_id),
   ];
