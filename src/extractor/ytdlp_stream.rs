@@ -19,20 +19,24 @@ impl Extractor for YtdlpStream {
     let url = format!("https://youtube.com/watch?v={video_id}");
 
     // yt-dlp -f 'ba[ext=m4a]' -o - 'https://youtube.com/watch?v=XXXXXXX'
-    let child = Command::new("yt-dlp")
+    let mut child = Command::new("yt-dlp")
       .arg("-f")
       .arg("ba[ext=m4a]")
       .arg("-o")
       .arg("-")
       .arg(url)
+      .stdout(std::process::Stdio::piped())
       .spawn()?;
 
-    let stream = ReaderStream::new(BufReader::new(child.stdout.unwrap()))
+    let stdout = child.stdout.take().expect("stdout not opened");
+    let stream = ReaderStream::new(BufReader::new(stdout))
       .map(|res| res.map_err(|e| e.into()));
     let stream = stream.boxed();
 
-    let mime_type = String::from("audio/mp4");
+    // wait for child to finish in another task
+    tokio::spawn(async move { child.wait().await.unwrap() });
 
+    let mime_type = String::from("audio/mp4");
     Ok(Extraction::Stream { mime_type, stream })
   }
 }
