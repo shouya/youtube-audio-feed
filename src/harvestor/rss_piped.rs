@@ -89,6 +89,10 @@ async fn make_episode(
   let thumbnail = W(&entry).thumbnail()?;
   let video_id = W(&entry).video_id()?;
 
+  if W(&entry).not_premiered() {
+    return Ok(None);
+  }
+
   let Some(piped_stream) = piped_channel.get_stream(&video_id) else {
     return Ok(None);
   };

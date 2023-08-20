@@ -130,6 +130,20 @@ impl W<&Entry> {
       mime_type: resp.mime_type,
     })
   }
+
+  pub fn not_premiered(&self) -> bool {
+    // return true if there is 0 views
+    self
+      .media_group_child("community")
+      .ok()
+      .into_iter()
+      .flat_map(|x| x.children.get("statistics"))
+      .flatten()
+      .next()
+      .and_then(|x| x.attrs.get("views"))
+      .map(|x| x == "0")
+      .unwrap_or(false)
+  }
 }
 
 fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
