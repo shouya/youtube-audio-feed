@@ -24,7 +24,7 @@ pub const INSTANCE_PUBLIC_URL: &str = "http://0.0.0.0:8080";
 
 pub const GENERATOR_STR: &str = "https://github.com/shouya/youtube_audio_feed";
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main(worker_threads = 4)]
 async fn main() -> Result<()> {
   let app = Router::new()
     .route("/", get(homepage))
