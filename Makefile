@@ -23,7 +23,7 @@ push-docker: build-docker
 	podman push $(IMAGE_NAME):$(VERSION)
 
 deploy: push-docker
-	flyctl deploy
+	flyctl deploy --image $(IMAGE_NAME):$(VERSION)
 .DEFAULT_GOAL := deploy
 
 .PHONY: build-docker push-docker
