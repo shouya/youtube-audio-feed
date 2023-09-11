@@ -16,6 +16,8 @@ pub struct RssYtextract {
 }
 
 impl RssYtextract {
+  // this harvestor backend may not be used
+  #[allow(unused)]
   pub fn new() -> Self {
     Self {
       client: Client::new(),

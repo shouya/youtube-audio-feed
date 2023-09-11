@@ -22,7 +22,7 @@ pub async fn channel_podcast_xml(
   piped: PipedInstance,
 ) -> Result<impl IntoResponse> {
   let (podcast, _) = select_ok([
-    harvestor::RssYtextract::new().harvest(&channel_id),
+    // harvestor::RssYtextract::new().harvest(&channel_id),
     harvestor::RssPiped::new(piped).harvest(&channel_id),
   ])
   .await?;
