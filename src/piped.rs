@@ -1,16 +1,20 @@
 #![allow(dead_code)]
-use std::{convert::Infallible, sync::Mutex};
+use std::{convert::Infallible, sync::Mutex, time::Duration};
 
 use async_trait::async_trait;
 use axum::extract::{FromRequestParts, Query};
 use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
+use tokio::{task::JoinSet, time::sleep};
 
 const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.aeong.one";
 
 static GLOBAL_PIPED_INSTANCE: Lazy<Mutex<PipedInstance>> =
   Lazy::new(|| Mutex::new(PipedInstance::default()));
+
+const PIPED_WIKI_URL: &str =
+  "https://raw.githubusercontent.com/wiki/TeamPiped/Piped/Instances.md";
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PipedInstance {
@@ -64,7 +68,7 @@ where
   }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct PipedInstanceStat {
   instance: PipedInstance,
   name: String,
@@ -72,11 +76,39 @@ struct PipedInstanceStat {
   latency: Option<u64>,
 }
 
-struct PipedInstanceRepo {
+pub struct PipedInstanceRepo {
   wiki_url: String,
 }
 
+impl Default for PipedInstanceRepo {
+  fn default() -> Self {
+    Self {
+      wiki_url: PIPED_WIKI_URL.to_string(),
+    }
+  }
+}
+
 impl PipedInstanceRepo {
+  pub async fn auto_update_global(self, interval: Duration) {
+    loop {
+      let instances = self.pull_latest().await;
+      let instances = check_latency(&instances, Duration::from_secs(10)).await;
+
+      if instances.is_empty() {
+        println!("No piped instance available.");
+        continue;
+      }
+
+      if let Some(instance) = instances.into_iter().next() {
+        let mut global = GLOBAL_PIPED_INSTANCE.lock().unwrap();
+        *global = instance.instance;
+        println!("Global piped instance updated: {:?}", *global);
+      };
+
+      sleep(interval).await;
+    }
+  }
+
   async fn pull_latest(&self) -> Vec<PipedInstanceStat> {
     let markdown = reqwest::get(&self.wiki_url)
       .await
@@ -127,6 +159,42 @@ impl PipedInstanceRepo {
   }
 }
 
+async fn check_latency(
+  instances: &[PipedInstanceStat],
+  timeout: Duration,
+) -> Vec<PipedInstanceStat> {
+  let mut tasks = JoinSet::new();
+  for stat in instances {
+    let mut stat = stat.clone();
+    tasks.spawn(async move {
+      let start = tokio::time::Instant::now();
+      if let Ok(resp) = reqwest::get(&stat.instance.api_url).await {
+        if resp.status().is_success() {
+          let elapsed = start.elapsed().as_millis() as u64;
+          stat.latency = Some(elapsed);
+        }
+      };
+      stat
+    });
+  }
+
+  let now = tokio::time::Instant::now();
+  let mut output = vec![];
+
+  while let Some(stat) = tasks.join_next().await {
+    if let Ok(stat) = stat {
+      output.push(stat);
+    }
+    if now.elapsed() >= timeout {
+      break;
+    }
+  }
+
+  output.sort_by_key(|x| x.latency.unwrap_or(u64::MAX));
+
+  output
+}
+
 fn from_flag_emoji(flag_char: char) -> char {
   let code = u32::from(flag_char) - 0x1f1e6_u32 + u32::from('A');
   std::char::from_u32(code).unwrap_or(flag_char)
@@ -139,9 +207,7 @@ mod tests {
   #[tokio::test]
   async fn test_piped_instance_repo() {
     let repo = PipedInstanceRepo {
-      wiki_url:
-        "https://raw.githubusercontent.com/wiki/TeamPiped/Piped/Instances.md"
-          .to_string(),
+      wiki_url: PIPED_WIKI_URL.to_string(),
     };
 
     let instances = repo.pull_latest().await;
