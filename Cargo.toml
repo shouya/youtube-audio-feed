@@ -1,5 +1,5 @@
 [package]
-name = "youtube_audio_feed"
+name = "youtube-audio-feed"
 version = "0.1.0"
 edition = "2021"
 
