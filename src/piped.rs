@@ -1,5 +1,9 @@
 #![allow(dead_code)]
-use std::{convert::Infallible, sync::Mutex, time::Duration};
+use std::{
+  convert::Infallible,
+  sync::{Arc, Mutex},
+  time::Duration,
+};
 
 use async_trait::async_trait;
 use axum::extract::{FromRequestParts, Query};
@@ -15,6 +19,8 @@ static GLOBAL_PIPED_INSTANCE: Lazy<Mutex<PipedInstance>> =
 
 const PIPED_WIKI_URL: &str =
   "https://raw.githubusercontent.com/wiki/TeamPiped/Piped/Instances.md";
+
+const PIPED_PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PipedInstance {
@@ -92,7 +98,7 @@ impl PipedInstanceRepo {
   pub async fn auto_update_global(self, interval: Duration) {
     loop {
       let instances = self.pull_latest().await;
-      let instances = check_latency(&instances, Duration::from_secs(10)).await;
+      let instances = check_latency(&instances).await;
 
       if instances.is_empty() {
         println!("No piped instance available.");
@@ -161,19 +167,27 @@ impl PipedInstanceRepo {
 
 async fn check_latency(
   instances: &[PipedInstanceStat],
-  timeout: Duration,
 ) -> Vec<PipedInstanceStat> {
+  let client = Arc::new(
+    reqwest::Client::builder()
+      .timeout(PIPED_PROBE_TIMEOUT)
+      .build()
+      .unwrap(),
+  );
+
   let mut tasks = JoinSet::new();
   for stat in instances {
     let mut stat = stat.clone();
+    let client = client.clone();
     tasks.spawn(async move {
       let start = tokio::time::Instant::now();
-      if let Ok(resp) = reqwest::get(&stat.instance.api_url).await {
-        if resp.status().is_success() {
+      match client.get(&stat.instance.api_url).send().await {
+        Ok(resp) if resp.status().is_success() => {
           let elapsed = start.elapsed().as_millis() as u64;
           stat.latency = Some(elapsed);
         }
-      };
+        _ => {}
+      }
       stat
     });
   }
@@ -185,13 +199,13 @@ async fn check_latency(
     if let Ok(stat) = stat {
       output.push(stat);
     }
-    if now.elapsed() >= timeout {
+
+    if now.elapsed() >= PIPED_PROBE_TIMEOUT {
       break;
     }
   }
 
   output.sort_by_key(|x| x.latency.unwrap_or(u64::MAX));
-
   output
 }
 
