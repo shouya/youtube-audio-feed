@@ -40,8 +40,6 @@ pub enum Error {
   Ytextract(#[from] ytextract::Error),
   #[error("invalid header: {0}")]
   InvalidHeader(#[from] http::header::InvalidHeaderValue),
-  #[error("invalid uri: {0}")]
-  InvalidUri(#[from] http::uri::InvalidUri),
 }
 
 impl IntoResponse for Error {
