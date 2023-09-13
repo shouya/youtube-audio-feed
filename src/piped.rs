@@ -6,11 +6,19 @@ use std::{
 };
 
 use async_trait::async_trait;
-use axum::extract::{FromRequestParts, Query};
+use axum::{
+  body::Body,
+  extract::{FromRequestParts, Path, Query},
+  response::Response,
+};
+use http::Request;
 use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinSet, time::sleep};
+use tower_service::Service;
+
+use crate::Result;
 
 const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.aeong.one";
 
@@ -215,6 +223,22 @@ async fn check_latency(
 fn from_flag_emoji(flag_char: char) -> char {
   let code = u32::from(flag_char) - 0x1f1e6_u32 + u32::from('A');
   std::char::from_u32(code).unwrap_or(flag_char)
+}
+
+#[axum::debug_handler]
+pub async fn proxy(
+  Path(path): Path<String>,
+  req: Request<Body>,
+) -> Result<Response> {
+  let uri: http::Uri = {
+    let instance = &GLOBAL_PIPED_INSTANCE.lock().unwrap().api_url;
+    format!("{instance}/{path}").parse()?
+  };
+
+  // redirect
+  let mut svc = tower_http::services::redirect::Redirect::temporary(uri);
+  let resp = svc.call(req).await.map_err(|e| match e {});
+  resp
 }
 
 #[cfg(test)]

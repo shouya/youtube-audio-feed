@@ -32,6 +32,7 @@ async fn main() -> Result<()> {
     .route("/", get(homepage))
     .route("/health", get(health))
     .route("/get-podcast", get(feed::channel_podcast_url))
+    .route("/piped/*rest", get(piped::proxy))
     .route("/channel/:channel_id", get(feed::channel_podcast_xml))
     .route("/audio/:video_id", get(audio::get_audio));
 
