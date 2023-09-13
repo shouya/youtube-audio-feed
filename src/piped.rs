@@ -22,6 +22,8 @@ const PIPED_WIKI_URL: &str =
 
 const PIPED_PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
+const PIPED_TEST_CHANNEL: &str = "UC1yNl2E66ZzKApQdRuTQ4tw";
+
 #[derive(Clone, Debug, Serialize)]
 pub struct PipedInstance {
   api_url: String,
@@ -181,7 +183,8 @@ async fn check_latency(
     let client = client.clone();
     tasks.spawn(async move {
       let start = tokio::time::Instant::now();
-      match client.get(&stat.instance.api_url).send().await {
+      let url = stat.instance.channel_url(PIPED_TEST_CHANNEL);
+      match client.get(&url).send().await {
         Ok(resp) if resp.status().is_success() => {
           let elapsed = start.elapsed().as_millis() as u64;
           stat.latency = Some(elapsed);
