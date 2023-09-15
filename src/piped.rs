@@ -109,8 +109,10 @@ impl PipedInstanceRepo {
     GLOBAL_REPO.current_instance.lock().unwrap().clone()
   }
 
-  pub fn notify_update() {
+  pub fn notify_update<E: std::error::Error>(e: E) -> E {
+    eprintln!("Failed requesting piped: {e:?}, refreshing");
     GLOBAL_REPO.update_signal.try_send(()).unwrap();
+    e
   }
 
   fn new(interval: Duration) -> Self {

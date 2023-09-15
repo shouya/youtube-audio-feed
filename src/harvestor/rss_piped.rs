@@ -10,7 +10,7 @@ use regex::Regex;
 use serde::Deserialize;
 
 use crate::{
-  piped::PipedInstance,
+  piped::{PipedInstance, PipedInstanceRepo},
   podcast::{AudioInfo, Episode, Podcast},
   Error, Result, INSTANCE_PUBLIC_URL, W,
 };
@@ -235,9 +235,11 @@ impl PipedChannel {
       .get(&url)
       .header("User-Agent", "Mozilla/5.0")
       .send()
-      .await?
+      .await
+      .map_err(|e| PipedInstanceRepo::notify_update(e))?
       .json::<PipedChannel>()
-      .await?;
+      .await
+      .map_err(|e| PipedInstanceRepo::notify_update(e))?;
 
     for stream in &mut channel.related_streams {
       stream.video_id = stream
