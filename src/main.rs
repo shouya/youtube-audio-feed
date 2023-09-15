@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use axum::{
   headers::ContentType, response::IntoResponse, routing::get, Router,
   TypedHeader,
@@ -37,13 +35,7 @@ async fn main() -> Result<()> {
 
   println!("Listening on {}", INSTANCE_PUBLIC_URL);
 
-  tokio::task::spawn(async move {
-    let interval = Duration::from_secs(60 * 60);
-
-    piped::PipedInstanceRepo::default()
-      .auto_update_global(interval)
-      .await;
-  });
+  tokio::task::spawn(async move { piped::PipedInstanceRepo::run().await });
 
   axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
     .serve(app.into_make_service())

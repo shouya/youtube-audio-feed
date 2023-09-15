@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::{
   convert::Infallible,
-  sync::{Arc, Mutex},
+  sync::{Arc, Mutex, RwLock},
   time::Duration,
 };
 
@@ -10,12 +10,12 @@ use axum::extract::{FromRequestParts, Query};
 use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
-use tokio::{task::JoinSet, time::sleep};
+use tokio::{
+  sync::mpsc::{channel, Receiver, Sender},
+  task::JoinSet,
+};
 
 const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.aeong.one";
-
-static GLOBAL_PIPED_INSTANCE: Lazy<Mutex<PipedInstance>> =
-  Lazy::new(|| Mutex::new(PipedInstance::default()));
 
 const PIPED_WIKI_URL: &str =
   "https://raw.githubusercontent.com/wiki/TeamPiped/Piped/Instances.md";
@@ -45,7 +45,7 @@ impl PipedInstance {
 
 impl Default for PipedInstance {
   fn default() -> Self {
-    Self::new(DEFAULT_PIPED_INSTANCE.to_string())
+    PipedInstanceRepo::instance()
   }
 }
 
@@ -70,7 +70,7 @@ where
       Query::<PipedInstanceQuery>::from_request_parts(parts, state)
         .await
         .map(|query| PipedInstance::new(query.0.piped_instance))
-        .unwrap_or_else(|_| GLOBAL_PIPED_INSTANCE.lock().unwrap().clone());
+        .unwrap_or_default();
 
     Ok(instance)
   }
@@ -86,20 +86,63 @@ struct PipedInstanceStat {
 
 pub struct PipedInstanceRepo {
   wiki_url: String,
+  current_instance: Mutex<PipedInstance>,
+  update_signal: Sender<()>,
+  update_receiver: RwLock<Option<Receiver<()>>>,
+  interval: Duration,
 }
 
 impl Default for PipedInstanceRepo {
   fn default() -> Self {
-    Self {
-      wiki_url: PIPED_WIKI_URL.to_string(),
-    }
+    Self::new(Duration::from_secs(60 * 60))
   }
 }
 
+static GLOBAL_REPO: Lazy<PipedInstanceRepo> = Lazy::new(|| Default::default());
+
 impl PipedInstanceRepo {
-  pub async fn auto_update_global(self, interval: Duration) {
+  pub fn global() -> &'static Self {
+    &GLOBAL_REPO
+  }
+
+  pub fn instance() -> PipedInstance {
+    GLOBAL_REPO.current_instance.lock().unwrap().clone()
+  }
+
+  pub fn notify_update() {
+    GLOBAL_REPO.update_signal.try_send(()).unwrap();
+  }
+
+  fn new(interval: Duration) -> Self {
+    let (update_signal, update_receiver) = channel(1);
+    let update_receiver = RwLock::new(Some(update_receiver));
+
+    Self {
+      wiki_url: PIPED_WIKI_URL.to_string(),
+      current_instance: Mutex::new(PipedInstance::new(
+        DEFAULT_PIPED_INSTANCE.to_string(),
+      )),
+      update_signal,
+      update_receiver,
+      interval,
+    }
+  }
+
+  pub async fn run() {
+    let this = Self::global();
+
+    let sleep = tokio::time::sleep(this.interval);
+    tokio::pin!(sleep);
+
+    let mut receiver = this
+      .update_receiver
+      .write()
+      .expect("piped instance repo not run as singleton")
+      .take()
+      .unwrap();
+
     loop {
-      let instances = self.pull_latest().await;
+      let instances = this.pull_latest().await;
       let instances = check_latency(&instances).await;
 
       if instances.is_empty() {
@@ -108,12 +151,15 @@ impl PipedInstanceRepo {
       }
 
       if let Some(instance) = instances.into_iter().next() {
-        let mut global = GLOBAL_PIPED_INSTANCE.lock().unwrap();
+        let mut global = this.current_instance.lock().unwrap();
         *global = instance.instance;
         println!("Global piped instance updated: {:?}", *global);
       };
 
-      sleep(interval).await;
+      tokio::select! {
+        () = &mut sleep => {},
+        _ = receiver.recv() => {},
+      }
     }
   }
 
