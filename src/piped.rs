@@ -133,9 +133,6 @@ impl PipedInstanceRepo {
   pub async fn run() {
     let this = Self::global();
 
-    let sleep = tokio::time::sleep(this.interval);
-    tokio::pin!(sleep);
-
     let mut receiver = this
       .update_receiver
       .write()
@@ -159,7 +156,7 @@ impl PipedInstanceRepo {
       };
 
       tokio::select! {
-        () = &mut sleep => {},
+        () = tokio::time::sleep(this.interval) => {},
         _ = receiver.recv() => {},
       }
     }
