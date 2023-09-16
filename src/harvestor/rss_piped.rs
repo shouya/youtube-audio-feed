@@ -236,10 +236,10 @@ impl PipedChannel {
       .header("User-Agent", "Mozilla/5.0")
       .send()
       .await
-      .map_err(|e| PipedInstanceRepo::notify_update(e))?
+      .map_err(PipedInstanceRepo::notify_update)?
       .json::<PipedChannel>()
       .await
-      .map_err(|e| PipedInstanceRepo::notify_update(e))?;
+      .map_err(PipedInstanceRepo::notify_update)?;
 
     for stream in &mut channel.related_streams {
       stream.video_id = stream

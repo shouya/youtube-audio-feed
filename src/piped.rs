@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::{
   convert::Infallible,
   sync::{Arc, Mutex, RwLock},
@@ -98,7 +97,7 @@ impl Default for PipedInstanceRepo {
   }
 }
 
-static GLOBAL_REPO: Lazy<PipedInstanceRepo> = Lazy::new(|| Default::default());
+static GLOBAL_REPO: Lazy<PipedInstanceRepo> = Lazy::new(Default::default);
 
 impl PipedInstanceRepo {
   pub fn global() -> &'static Self {
