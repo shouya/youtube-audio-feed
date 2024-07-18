@@ -33,6 +33,9 @@ async fn main() -> Result<()> {
     .route("/channel/:channel_id", get(feed::channel_podcast_xml))
     .route("/audio/:video_id", get(audio::get_audio));
 
+  ctrlc::set_handler(move || std::process::exit(0))
+    .expect("Error setting SIGINT/SIGTERM handler");
+
   println!("Listening on {}", INSTANCE_PUBLIC_URL);
 
   tokio::task::spawn(async move { piped::PipedInstanceRepo::run().await });

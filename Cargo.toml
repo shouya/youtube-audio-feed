@@ -11,6 +11,7 @@ atom_syndication = "0.12.1"
 axum = { version = "0.6.18", features = ["macros", "headers"] }
 bytes = "1.4.0"
 chrono = "0.4.26"
+ctrlc = { version = "3.4.4", features = ["termination"] }
 futures = "0.3.28"
 http = "0.2.9"
 http-types = "2.12.0"
