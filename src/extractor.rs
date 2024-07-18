@@ -20,6 +20,7 @@ pub enum Extraction {
   },
   Stream {
     stream: BoxStream<'static, Result<Bytes>>,
+    filesize: Option<u64>,
     mime_type: String,
   },
 }

@@ -40,6 +40,8 @@ pub enum Error {
   Ytextract(#[from] ytextract::Error),
   #[error("invalid header: {0}")]
   InvalidHeader(#[from] http::header::InvalidHeaderValue),
+  #[error("decode json error: {0}")]
+  DecodeJson(#[from] serde_json::Error),
 }
 
 impl IntoResponse for Error {

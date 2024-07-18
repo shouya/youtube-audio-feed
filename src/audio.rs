@@ -39,11 +39,13 @@ pub async fn get_audio(
         .await
         .map(|x| x.into_response())
     }
-    Extraction::Stream { stream, mime_type } => {
-      proxy_stream(stream, mime_type, req_headers)
-        .await
-        .map(|x| x.into_response())
-    }
+    Extraction::Stream {
+      stream,
+      mime_type,
+      filesize,
+    } => proxy_stream(stream, mime_type, filesize, req_headers)
+      .await
+      .map(|x| x.into_response()),
   }
 }
 
@@ -71,6 +73,7 @@ fn parse_range(range: Option<&str>) -> (Option<usize>, Option<usize>) {
 async fn proxy_stream(
   stream: BoxStream<'static, Result<bytes::Bytes>>,
   mime_type: String,
+  filesize: Option<u64>,
   req_headers: HeaderMap,
 ) -> Result<impl IntoResponse> {
   let range = req_headers
@@ -98,10 +101,16 @@ async fn proxy_stream(
 
   let mut headers = HeaderMap::new();
   headers.insert(header::CONTENT_TYPE, HeaderValue::from_str(&mime_type)?);
+
   if let Some(content_range) = to_content_range(range) {
     headers.insert(
       header::CONTENT_RANGE,
       HeaderValue::from_str(&content_range)?,
+    );
+  } else if let Some(filesize) = filesize {
+    headers.insert(
+      header::CONTENT_LENGTH,
+      HeaderValue::from_str(&filesize.to_string())?,
     );
   }
 
