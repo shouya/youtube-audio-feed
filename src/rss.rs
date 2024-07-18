@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::io::Cursor;
 
 use atom_syndication::{Entry, Feed};

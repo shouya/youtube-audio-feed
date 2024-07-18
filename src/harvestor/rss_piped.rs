@@ -54,7 +54,7 @@ async fn make_podcast(
 
   let mut podcast = Podcast {
     title: feed.title.to_string(),
-    description: piped_channel.description.clone(),
+    description: piped_channel.description.clone().unwrap_or_default(),
     last_build_date: feed.updated.to_rfc2822(),
     language: feed.lang.unwrap_or_default(),
     author: feed.authors.iter().map(|x| &x.name).join(", "),
@@ -212,7 +212,7 @@ struct ExtraInfo {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PipedChannel {
-  description: String,
+  description: Option<String>,
   related_streams: Vec<PipedStream>,
 }
 

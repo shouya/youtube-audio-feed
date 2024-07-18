@@ -11,7 +11,6 @@ use crate::Result;
 
 pub use self::rustube::Rustube;
 pub use piped::Piped;
-pub use ytdlp::Ytdlp;
 pub use ytdlp_stream::YtdlpStream;
 
 pub enum Extraction {
