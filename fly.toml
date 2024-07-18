@@ -43,10 +43,10 @@ swap_size_mb = 512
     path = "/health"
     protocol = "http"
 
-  [[services.http_checks]]
-    interval = "5m0s"
-    timeout = "1m0s"
-    grace_period = "10s"
-    method = "get"
-    path = "/channel/UC1yNl2E66ZzKApQdRuTQ4tw"
-    protocol = "http"
+  # [[services.http_checks]]
+  #   interval = "5m0s"
+  #   timeout = "1m0s"
+  #   grace_period = "10s"
+  #   method = "get"
+  #   path = "/channel/UC1yNl2E66ZzKApQdRuTQ4tw"
+  #   protocol = "http"
