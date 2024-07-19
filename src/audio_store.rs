@@ -50,15 +50,15 @@ impl AudioStore {
     &mut self,
     audio_id: String,
   ) -> Result<(Arc<AudioFile>, bool)> {
-    match self.files.entry(audio_id.clone()) {
-      Entry::Occupied(entry) => Ok((entry.into_mut().clone(), false)),
-      Entry::Vacant(entry) => {
-        let file = AudioFile::new(&self.base_dir, &audio_id);
-        let value = Arc::new(file);
-        entry.insert(value.clone());
-        Ok((value, true))
-      }
+    if let (Some(file), evicted) = self.files.notify_get(&audio_id) {
+      drop(evicted);
+      return Ok((file.clone(), false));
     }
+
+    let file = AudioFile::new(&self.base_dir, &audio_id);
+    let value = Arc::new(file);
+    self.files.insert(audio_id, value.clone());
+    Ok((value, true))
   }
 
   #[message]
