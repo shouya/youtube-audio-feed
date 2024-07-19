@@ -6,6 +6,7 @@ mod ytdlp_stream;
 use async_trait::async_trait;
 use axum::body::Bytes;
 use futures::stream::BoxStream;
+use tokio::fs::File;
 
 use crate::Result;
 
@@ -18,9 +19,14 @@ pub enum Extraction {
     url: String,
     headers: Vec<(String, String)>,
   },
+  #[allow(unused)]
   Stream {
     stream: BoxStream<'static, Result<Bytes>>,
     filesize: Option<u64>,
+    mime_type: String,
+  },
+  File {
+    file: File,
     mime_type: String,
   },
 }

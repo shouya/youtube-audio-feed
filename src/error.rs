@@ -42,6 +42,10 @@ pub enum Error {
   InvalidHeader(#[from] http::header::InvalidHeaderValue),
   #[error("decode json error: {0}")]
   DecodeJson(#[from] serde_json::Error),
+  #[error("storage full: {0}")]
+  StorageFull(String),
+  #[error("file pending: {0}")]
+  FilePending(String),
 }
 
 impl IntoResponse for Error {
