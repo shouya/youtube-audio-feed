@@ -31,7 +31,11 @@ pub const GENERATOR_STR: &str = "https://github.com/shouya/youtube_audio_feed";
 
 #[tokio::main(worker_threads = 4)]
 async fn main() -> Result<()> {
-  let audio_store = AudioStore::new("/tmp/audio-store/");
+  let audio_store = if cfg!(not(debug_assertions)) {
+    AudioStore::new("/data/audio-store/")
+  } else {
+    AudioStore::new("/tmp/audio-store/")
+  };
   let audio_store_ref = audio_store.spawn();
 
   let app = Router::new()

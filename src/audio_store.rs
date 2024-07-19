@@ -82,8 +82,10 @@ impl AudioStore {
 impl AudioStore {
   pub fn new(base_dir: impl AsRef<Path>) -> Self {
     let files = LruCache::with_expiry_duration_and_capacity(
+      // expire after 1 hour
       std::time::Duration::from_secs(60 * 60),
-      100,
+      // store up to 30 files
+      30,
     );
 
     // delete all existing files

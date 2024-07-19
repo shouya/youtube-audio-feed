@@ -15,6 +15,10 @@ swap_size_mb = 512
 [build]
   image = "registry.fly.io/youtube-audio-feed:latest"
 
+[mounts]
+  source = "youtube_audio_feed_stash"
+  destination = "/data"
+
 [[services]]
   protocol = "tcp"
   internal_port = 8080
