@@ -63,6 +63,7 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
   let audio_id = audio_file.id();
   let temp_path = audio_file.temp_path();
   let url = format!("https://youtube.com/watch?v={audio_id}");
+  eprintln!("downloading audio file: {}", url);
 
   let child = Command::new("yt-dlp")
     .arg("-f")
@@ -70,6 +71,7 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
     .arg("--no-progress")
     .arg("-o")
     .arg(temp_path)
+    .arg("--no-mtime")
     .arg(url)
     .stderr(std::process::Stdio::piped())
     .spawn()?;

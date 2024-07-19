@@ -5,7 +5,7 @@ use std::{
 };
 
 use kameo::{actor::ActorRef, messages, Actor};
-use lru_time_cache::{Entry, LruCache};
+use lru_time_cache::LruCache;
 use tokio::fs::File;
 
 use crate::{Error, Result};

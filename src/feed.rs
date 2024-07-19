@@ -20,7 +20,18 @@ use crate::{
 pub async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
   piped: PipedInstance,
+  req_headers: header::HeaderMap,
 ) -> Result<impl IntoResponse> {
+  let user_agent = req_headers
+    .get(header::USER_AGENT)
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("unknown");
+
+  eprintln!(
+    "client requesting podcast: {} (user-agent: {})",
+    channel_id, user_agent
+  );
+
   let (podcast, _) = select_ok([
     // harvestor::RssYtextract::new().harvest(&channel_id),
     harvestor::RssPiped::new(piped).harvest(&channel_id),

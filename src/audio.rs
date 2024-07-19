@@ -31,6 +31,20 @@ pub async fn get_audio(
   req_headers: HeaderMap,
   Extension(audio_store): Extension<Arc<AudioStoreRef>>,
 ) -> Result<impl IntoResponse> {
+  let user_agent = req_headers
+    .get(header::USER_AGENT)
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("unknown");
+  let range = req_headers
+    .get(header::RANGE)
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("none");
+
+  eprintln!(
+    "client requesting audio: {} (range: {}, user-agent: {})",
+    video_id, range, user_agent
+  );
+
   #[allow(unused)]
   let piped_extractor = extractor::Piped(&piped);
   #[allow(unused)]
