@@ -31,6 +31,7 @@ pub async fn get_audio(
   req_headers: HeaderMap,
   Extension(audio_store): Extension<Arc<AudioStoreRef>>,
 ) -> Result<impl IntoResponse> {
+  #[allow(unused)]
   let piped_extractor = extractor::Piped(&piped);
   #[allow(unused)]
   let ytdlp_stream = extractor::YtdlpStream;

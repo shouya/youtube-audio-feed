@@ -31,7 +31,10 @@ impl Extractor for YtdlpFile {
     if audio_file.is_finished().await {
       serve_file(&audio_file).await
     } else {
-      download_file(&audio_file).await?;
+      if let Err(e) = download_file(&audio_file).await {
+        self.audio_store.remove(video_id.to_string()).await?;
+        return Err(e);
+      }
       serve_file(&audio_file).await
     }
   }

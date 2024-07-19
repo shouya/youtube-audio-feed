@@ -62,20 +62,18 @@ impl AudioStore {
     audio_id: String,
   ) -> Result<Arc<AudioFile>> {
     match self.files.entry(audio_id.clone()) {
-      Entry::Occupied(entry) => {
-        let entry = entry.into_mut();
-        while !entry.is_finished().await {
-          tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
-
-        Ok(entry.clone())
-      }
+      Entry::Occupied(entry) => Ok(entry.into_mut().clone()),
       Entry::Vacant(entry) => {
         let file = Arc::new(AudioFile::new(&self.base_dir, &audio_id));
         entry.insert(file.clone());
         Ok(file)
       }
     }
+  }
+
+  #[message]
+  async fn remove(&mut self, audio_id: String) {
+    self.files.remove(&audio_id);
   }
 }
 
@@ -109,6 +107,12 @@ impl AudioStoreRef {
     audio_id: String,
   ) -> Result<Arc<AudioFile>> {
     Ok(self.0.ask(GetOrAllocate { audio_id }).send().await.unwrap())
+  }
+
+  pub async fn remove(&self, audio_id: String) -> Result<()> {
+    let audio_id = audio_id.to_string();
+    self.0.ask(Remove { audio_id }).send().await.unwrap();
+    Ok(())
   }
 }
 

@@ -11,6 +11,7 @@ use tokio::fs::File;
 
 use crate::Result;
 
+#[allow(unused)]
 pub use self::rustube::Rustube;
 pub use piped::Piped;
 pub use ytdlp_file::YtdlpFile;
