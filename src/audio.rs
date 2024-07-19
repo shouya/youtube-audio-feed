@@ -32,14 +32,15 @@ pub async fn get_audio(
   Extension(audio_store): Extension<Arc<AudioStoreRef>>,
 ) -> Result<impl IntoResponse> {
   let piped_extractor = extractor::Piped(&piped);
+  #[allow(unused)]
   let ytdlp_stream = extractor::YtdlpStream;
   #[allow(unused)]
   let ytdlp_file = extractor::YtdlpFile::new(audio_store.clone());
   let extractions: Vec<_> = vec![
-    ytdlp_stream.extract(&video_id),
-    // ytdlp_file.extract(&video_id),
-    extractor::Rustube.extract(&video_id),
-    piped_extractor.extract(&video_id),
+    // ytdlp_stream.extract(&video_id),
+    ytdlp_file.extract(&video_id),
+    // extractor::Rustube.extract(&video_id),
+    // piped_extractor.extract(&video_id),
   ];
 
   let extraction = race_ordered_first_ok(extractions).await?;
