@@ -4,31 +4,18 @@ use std::{
   time::Instant,
 };
 
-use bytes::Bytes;
-use futures::{Stream, StreamExt as _};
 use kameo::{actor::ActorRef, messages, Actor};
 use lru_time_cache::{Entry, LruCache};
-use tokio::{fs::File, io::BufReader, sync::RwLock};
-use tokio_util::io::ReaderStream;
+use tokio::fs::File;
 
 use crate::{Error, Result};
-
-enum AudioStatus {
-  Pending,
-  Finished {
-    #[allow(unused)]
-    file_size: u64,
-    #[allow(unused)]
-    finished_at: Instant,
-  },
-}
 
 pub struct AudioFile {
   id: String,
   path: PathBuf,
-  #[allow(unused)]
+  temp_path: PathBuf,
+  #[allow(dead_code)]
   created_at: Instant,
-  status: RwLock<AudioStatus>,
 }
 
 impl Drop for AudioFile {
@@ -37,6 +24,8 @@ impl Drop for AudioFile {
     if !self.path.exists() {
       return;
     }
+
+    std::fs::remove_file(&self.temp_path).ok();
 
     if let Err(e) = std::fs::remove_file(&self.path) {
       eprintln!("failed to delete file: {}", e);
@@ -60,13 +49,14 @@ impl AudioStore {
   async fn get_or_allocate(
     &mut self,
     audio_id: String,
-  ) -> Result<Arc<AudioFile>> {
+  ) -> Result<(Arc<AudioFile>, bool)> {
     match self.files.entry(audio_id.clone()) {
-      Entry::Occupied(entry) => Ok(entry.into_mut().clone()),
+      Entry::Occupied(entry) => Ok((entry.into_mut().clone(), false)),
       Entry::Vacant(entry) => {
-        let file = Arc::new(AudioFile::new(&self.base_dir, &audio_id));
-        entry.insert(file.clone());
-        Ok(file)
+        let file = AudioFile::new(&self.base_dir, &audio_id);
+        let value = Arc::new(file);
+        entry.insert(value.clone());
+        Ok((value, true))
       }
     }
   }
@@ -80,8 +70,8 @@ impl AudioStore {
 impl AudioStore {
   pub fn new(base_dir: impl AsRef<Path>) -> Self {
     let files = LruCache::with_expiry_duration_and_capacity(
-      // expire after 1 hour
-      std::time::Duration::from_secs(60 * 60),
+      // expire after 10 minutes
+      std::time::Duration::from_secs(10 * 60),
       // store up to 30 files
       30,
     );
@@ -105,7 +95,7 @@ impl AudioStoreRef {
   pub async fn get_or_allocate(
     &self,
     audio_id: String,
-  ) -> Result<Arc<AudioFile>> {
+  ) -> Result<(Arc<AudioFile>, bool)> {
     Ok(self.0.ask(GetOrAllocate { audio_id }).send().await.unwrap())
   }
 
@@ -119,35 +109,12 @@ impl AudioStoreRef {
 impl AudioFile {
   fn new(base_dir: &Path, audio_id: &str) -> Self {
     let file_path = base_dir.join(audio_id).with_extension("m4a");
+    let temp_path = base_dir.join(audio_id).with_extension("temp.m4a");
     Self {
       id: audio_id.to_string(),
       path: file_path,
+      temp_path,
       created_at: Instant::now(),
-      status: RwLock::new(AudioStatus::Pending),
-    }
-  }
-
-  pub async fn mark_finished(&self) -> Result<()> {
-    let mut write = self.status.write().await;
-    *write = AudioStatus::Finished {
-      file_size: self.path.metadata()?.len(),
-      finished_at: Instant::now(),
-    };
-    Ok(())
-  }
-
-  pub async fn is_finished(&self) -> bool {
-    let read = self.status.read().await;
-    matches!(&*read, AudioStatus::Finished { .. })
-  }
-
-  #[allow(unused)]
-  pub async fn size(&self) -> Option<u64> {
-    let read = self.status.read().await;
-
-    match &*read {
-      AudioStatus::Finished { file_size, .. } => Some(*file_size),
-      _ => None,
     }
   }
 
@@ -155,23 +122,19 @@ impl AudioFile {
     File::open(&self.path).await.map_err(Error::IO)
   }
 
-  #[allow(unused)]
-  pub async fn read(&self) -> Result<impl Stream<Item = Result<Bytes>>> {
-    while !self.is_finished().await {
-      tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    }
-
-    let file = File::open(&self.path).await?;
-    let stream = ReaderStream::new(BufReader::new(file));
-
-    Ok(stream.map(|r| r.map(Bytes::from).map_err(Error::IO)))
-  }
-
   pub fn id(&self) -> &str {
     &self.id
   }
 
+  pub fn ready(&self) -> bool {
+    self.path.exists()
+  }
+
   pub fn path(&self) -> &Path {
     &self.path
+  }
+
+  pub fn temp_path(&self) -> &Path {
+    &self.temp_path
   }
 }

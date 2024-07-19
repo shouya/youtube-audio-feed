@@ -23,26 +23,45 @@ impl YtdlpFile {
 #[async_trait]
 impl Extractor for YtdlpFile {
   async fn extract(&self, video_id: &str) -> Result<Extraction> {
-    let audio_file = self
+    let (audio_file, new) = self
       .audio_store
       .get_or_allocate(video_id.to_string())
       .await?;
 
-    if audio_file.is_finished().await {
-      serve_file(&audio_file).await
-    } else {
+    if new {
       if let Err(e) = download_file(&audio_file).await {
         self.audio_store.remove(video_id.to_string()).await?;
         return Err(e);
       }
-      serve_file(&audio_file).await
     }
+
+    if !wait_for_file(&audio_file).await {
+      self.audio_store.remove(video_id.to_string()).await?;
+      return Err(Error::AudioStream("file not found".to_string()));
+    }
+
+    serve_file(&audio_file).await
   }
+}
+
+async fn wait_for_file(audio_file: &AudioFile) -> bool {
+  let max_wait_time = std::time::Duration::from_secs(10);
+  let start = std::time::Instant::now();
+
+  while !audio_file.ready() {
+    if start.elapsed() > max_wait_time {
+      return false;
+    }
+
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+  }
+
+  true
 }
 
 async fn download_file(audio_file: &AudioFile) -> Result<()> {
   let audio_id = audio_file.id();
-  let file_path = audio_file.path();
+  let temp_path = audio_file.temp_path();
   let url = format!("https://youtube.com/watch?v={audio_id}");
 
   let child = Command::new("yt-dlp")
@@ -50,14 +69,15 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
     .arg("ba[ext=m4a]")
     .arg("--no-progress")
     .arg("-o")
-    .arg(file_path)
+    .arg(temp_path)
     .arg(url)
     .stderr(std::process::Stdio::piped())
     .spawn()?;
 
   let output = child.wait_with_output().await?;
   detect_error(&output.stderr)?;
-  audio_file.mark_finished().await?;
+
+  std::fs::rename(temp_path, audio_file.path()).map_err(Error::IO)?;
 
   Ok(())
 }
