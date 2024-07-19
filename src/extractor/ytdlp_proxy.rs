@@ -8,10 +8,10 @@ use super::{Extraction, Extractor};
 
 // run yt-dlp command line to get audio playback url.
 // requires yt-dlp executable to be in PATH.
-pub struct Ytdlp;
+pub struct YtdlpProxy;
 
 #[async_trait]
-impl Extractor for Ytdlp {
+impl Extractor for YtdlpProxy {
   async fn extract(&self, video_id: &str) -> Result<Extraction> {
     use serde::Deserialize;
     use tokio::process::Command;

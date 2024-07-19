@@ -1,6 +1,7 @@
 mod piped;
 mod rustube;
-mod ytdlp;
+mod ytdlp_file;
+mod ytdlp_proxy;
 mod ytdlp_stream;
 
 use async_trait::async_trait;
@@ -12,6 +13,7 @@ use crate::Result;
 
 pub use self::rustube::Rustube;
 pub use piped::Piped;
+pub use ytdlp_file::YtdlpFile;
 pub use ytdlp_stream::YtdlpStream;
 
 pub enum Extraction {

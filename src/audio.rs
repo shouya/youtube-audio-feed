@@ -32,9 +32,12 @@ pub async fn get_audio(
   Extension(audio_store): Extension<Arc<AudioStoreRef>>,
 ) -> Result<impl IntoResponse> {
   let piped_extractor = extractor::Piped(&piped);
-  let ytdlp_stream = extractor::YtdlpStream::new(audio_store);
+  let ytdlp_stream = extractor::YtdlpStream;
+  #[allow(unused)]
+  let ytdlp_file = extractor::YtdlpFile::new(audio_store.clone());
   let extractions: Vec<_> = vec![
     ytdlp_stream.extract(&video_id),
+    // ytdlp_file.extract(&video_id),
     extractor::Rustube.extract(&video_id),
     piped_extractor.extract(&video_id),
   ];
@@ -95,7 +98,6 @@ async fn proxy_stream(
     .get(header::RANGE)
     .and_then(|range| range.to_str().ok());
   let range = parse_range(range);
-
   let stream = ByteStream::new(stream);
 
   let stream = match range {
@@ -117,13 +119,6 @@ async fn proxy_stream(
   let mut headers = HeaderMap::new();
   headers.insert(header::CONTENT_TYPE, HeaderValue::from_str(&mime_type)?);
 
-  if let Some(content_range) = to_content_range(range) {
-    headers.insert(
-      header::CONTENT_RANGE,
-      HeaderValue::from_str(&content_range)?,
-    );
-  }
-
   if let Some(filesize) = filesize {
     headers.insert(
       header::CONTENT_LENGTH,
@@ -131,16 +126,13 @@ async fn proxy_stream(
     );
   }
 
-  Ok((headers, stream))
-}
+  let status = if range.0.is_some() || range.1.is_some() {
+    http::StatusCode::PARTIAL_CONTENT
+  } else {
+    http::StatusCode::OK
+  };
 
-fn to_content_range(range: (Option<usize>, Option<usize>)) -> Option<String> {
-  match range {
-    (Some(start), Some(end)) => Some(format!("bytes {}-{}/*", start, end)),
-    (Some(start), None) => Some(format!("bytes {}-*/?", start)),
-    (None, Some(end)) => Some(format!("bytes */{}", end + 1)),
-    (_, _) => None,
-  }
+  Ok((status, headers, stream))
 }
 
 async fn serve_file(
