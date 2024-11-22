@@ -1,6 +1,7 @@
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
+use regex::Regex;
 use tokio::process::Command;
 
 use crate::audio_store::{AudioFile, AudioStoreRef};
@@ -78,6 +79,13 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
     .arg(url);
 
   if let Some(proxy) = ytdlp_proxy() {
+    // used to remove cred info from proxy url before printing
+    static AUTH_REGEX: LazyLock<Regex> =
+      LazyLock::new(|| Regex::new(r"//[^:]+(:[^@]+)@").unwrap());
+    eprintln!(
+      "using proxy: {}",
+      AUTH_REGEX.replace(proxy, "//<REDACTED>@")
+    );
     cmd.arg("--proxy").arg(proxy);
   }
 
