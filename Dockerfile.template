@@ -1,3 +1,4 @@
 FROM docker.io/library/alpine:edge AS RUNNER
 
-RUN apk add --no-cache yt-dlp
+# py3-requests is required for HTTPS proxy support in yt-dlp
+RUN apk add --no-cache py3-requests yt-dlpwe
