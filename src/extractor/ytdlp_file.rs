@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tokio::process::Command;
 
 use crate::audio_store::{AudioFile, AudioStoreRef};
+use crate::util::ytdlp_proxy;
 use crate::{Error, Result};
 
 use super::{Extraction, Extractor};
@@ -65,16 +66,22 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
   let url = format!("https://youtube.com/watch?v={audio_id}");
   eprintln!("downloading audio file: {}", url);
 
-  let child = Command::new("yt-dlp")
+  let mut cmd = Command::new("yt-dlp");
+
+  cmd
     .arg("-f")
     .arg("ba[ext=m4a]")
     .arg("--no-progress")
     .arg("-o")
     .arg(temp_path)
     .arg("--no-mtime")
-    .arg(url)
-    .stderr(std::process::Stdio::piped())
-    .spawn()?;
+    .arg(url);
+
+  if let Some(proxy) = ytdlp_proxy() {
+    cmd.arg("--proxy").arg(proxy);
+  }
+
+  let child = cmd.stderr(std::process::Stdio::piped()).spawn()?;
 
   let output = child.wait_with_output().await?;
   detect_error(&output.stderr)?;

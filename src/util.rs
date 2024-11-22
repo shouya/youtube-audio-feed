@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use futures::Future;
 
 mod byte_stream;
@@ -78,4 +80,12 @@ mod test {
     assert!(now.elapsed() > Duration::from_millis(400));
     assert!(now.elapsed() < Duration::from_millis(500));
   }
+}
+
+// read ytdlp_proxy from environment variable (YTDLP_PROXY) and return it.
+static YTDLP_PROXY: LazyLock<Option<String>> =
+  LazyLock::new(|| std::env::var("YTDLP_PROXY").ok());
+
+pub fn ytdlp_proxy() -> Option<&'static str> {
+  YTDLP_PROXY.as_deref()
 }
