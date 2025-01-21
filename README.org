@@ -15,6 +15,7 @@ The two major components are:
 
 Here are the implemented harvestors:
 
+- ytdlp flat-playlist (https://github.com/yt-dlp/yt-dlp)
 - ytextract (https://github.com/Azorlogh/ytextract)
 - piped (https://github.com/TeamPiped/Piped/wiki/Instances)
 
