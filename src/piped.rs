@@ -23,6 +23,7 @@ const PIPED_PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
 const PIPED_TEST_CHANNEL: &str = "UC1yNl2E66ZzKApQdRuTQ4tw";
 
+#[allow(unused)]
 #[derive(Clone, Debug, Serialize)]
 pub struct PipedInstance {
   api_url: String,
@@ -267,9 +268,7 @@ mod tests {
 
   #[tokio::test]
   async fn test_piped_instance_repo() {
-    let repo = PipedInstanceRepo {
-      wiki_url: PIPED_WIKI_URL.to_string(),
-    };
+    let repo = PipedInstanceRepo::global();
 
     let instances = repo.pull_latest().await;
     println!("{:#?}", &instances);

@@ -22,6 +22,7 @@ pub struct RssPiped {
 }
 
 impl RssPiped {
+  #[allow(unused)]
   pub fn new(piped: PipedInstance) -> Self {
     Self { piped }
   }

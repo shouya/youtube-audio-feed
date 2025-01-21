@@ -7,7 +7,7 @@ use super::{Extraction, Extractor};
 pub struct Piped<'a>(pub &'a PipedInstance);
 
 #[async_trait]
-impl<'a> Extractor for Piped<'a> {
+impl Extractor for Piped<'_> {
   async fn extract(&self, video_id: &str) -> Result<Extraction> {
     use serde_query::{DeserializeQuery, Query};
 
