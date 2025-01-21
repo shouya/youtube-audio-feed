@@ -19,7 +19,7 @@ use crate::{
 
 pub async fn channel_podcast_xml(
   Path(channel_id): Path<String>,
-  _piped: PipedInstance,
+  piped: Option<PipedInstance>,
   req_headers: header::HeaderMap,
 ) -> Result<impl IntoResponse> {
   let user_agent = req_headers
@@ -32,8 +32,14 @@ pub async fn channel_podcast_xml(
     channel_id, user_agent
   );
 
+  let mut harvestors: Vec<Box<dyn Harvestor + Send>> = vec![];
+  harvestors.push(Box::new(harvestor::Ytdlp::new()));
+  if let Some(piped) = piped {
+    harvestors.push(Box::new(harvestor::RssPiped::new(piped)));
+  }
+
   let (podcast, _) =
-    select_ok([harvestor::Ytdlp::new().harvest(&channel_id)]).await?;
+    select_ok(harvestors.iter().map(|h| h.harvest(&channel_id))).await?;
 
   let podcast_channel: rss::Channel = podcast.into();
 
