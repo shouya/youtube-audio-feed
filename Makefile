@@ -13,7 +13,7 @@ $(BINARY): $(SOURCES)
 
 build-docker: $(BINARY)
 	(cat Dockerfile.template && \
-	echo "\nCOPY $< /$(APP_NAME)\nCMD [\"/$(APP_NAME)\"]\n") | \
+	echo -e "\nCOPY $< /$(APP_NAME)\nCMD [\"/$(APP_NAME)\"]\n") | \
 		podman build -f - . \
 			-t $(IMAGE_NAME):latest \
 			-t $(IMAGE_NAME):$(VERSION)
