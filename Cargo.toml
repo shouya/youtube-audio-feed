@@ -11,7 +11,6 @@ atom_syndication = "0.12.1"
 axum = { version = "0.6.18", features = ["macros", "headers"] }
 bytes = "1.4.0"
 chrono = "0.4.26"
-ctrlc = { version = "3.4.4", features = ["termination"] }
 futures = "0.3.28"
 http = "0.2.9"
 http-types = "2.12.0"
@@ -33,5 +32,8 @@ thiserror = "1.0.40"
 # tl = { version = "0.7.6", features = ["simd"] }
 tl = { version = "0.7.6" }
 tokio = { version = "1.20.1", features = ["macros", "process", "rt-multi-thread"] }
+tokio-graceful-shutdown = "0.16.0"
 tokio-util = "0.7.8"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
 ytextract = { git = "https://github.com/Azorlogh/ytextract.git" }

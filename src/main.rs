@@ -17,6 +17,7 @@ mod rss;
 mod util;
 
 pub use error::{Error, Result};
+use tracing::info;
 pub use util::W;
 
 use crate::audio_store::AudioStore;
@@ -31,6 +32,15 @@ pub const GENERATOR_STR: &str = "https://github.com/shouya/youtube_audio_feed";
 
 #[tokio::main(worker_threads = 4)]
 async fn main() -> Result<()> {
+  tracing_subscriber::fmt::init();
+
+  #[cfg(unix)]
+  {
+    tokio::spawn(async {
+      signal_handler().await.expect("Signal handler failed");
+    });
+  }
+
   let audio_store = if cfg!(not(debug_assertions)) {
     AudioStore::new("/data/audio-store/")
   } else {
@@ -46,10 +56,7 @@ async fn main() -> Result<()> {
     .route("/audio/:video_id", get(audio::get_audio))
     .layer(Extension(Arc::new(audio_store_ref)));
 
-  ctrlc::set_handler(move || std::process::exit(0))
-    .expect("Error setting SIGINT/SIGTERM handler");
-
-  println!("Listening on {}", INSTANCE_PUBLIC_URL);
+  info!("Listening on {}", INSTANCE_PUBLIC_URL);
 
   tokio::task::spawn(async move { piped::PipedInstanceRepo::run().await });
 
@@ -72,4 +79,23 @@ async fn homepage() -> impl IntoResponse {
 
 async fn health() -> impl IntoResponse {
   "ok".to_owned()
+}
+
+#[cfg(unix)]
+async fn signal_handler() -> Result<()> {
+  use tokio::signal::unix::{signal, SignalKind};
+
+  let mut sigint = signal(SignalKind::interrupt())?;
+  let mut sigterm = signal(SignalKind::terminate())?;
+
+  tokio::select! {
+    _ = sigint.recv() => {
+      info!("Received SIGINT, shutting down...");
+    }
+    _ = sigterm.recv() => {
+      info!("Received SIGTERM, shutting down...");
+    }
+  };
+
+  std::process::exit(0)
 }
