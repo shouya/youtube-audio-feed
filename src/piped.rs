@@ -14,10 +14,10 @@ use tokio::{
   task::JoinSet,
 };
 
-const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.aeong.one";
+const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.leptons.xyz";
 
 const PIPED_WIKI_URL: &str =
-  "https://raw.githubusercontent.com/wiki/TeamPiped/Piped/Instances.md";
+  "https://raw.githubusercontent.com/TeamPiped/documentation/refs/heads/main/content/docs/public-instances/index.md";
 
 const PIPED_PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
