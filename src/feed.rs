@@ -62,15 +62,19 @@ pub struct GetPodcastReq {
 pub async fn channel_podcast_url(
   Query(req): Query<GetPodcastReq>,
 ) -> Result<impl IntoResponse> {
-  let channel_ref = extract_youtube_channel_ref(&req.url)?;
-  let channel_id = find_youtube_channel_id(channel_ref).await?;
+  let channel_id = find_youtube_channel_id(&req.url).await?;
   let podcast_url = format!("{INSTANCE_PUBLIC_URL}/channel/{channel_id}");
   let content_type = TypedHeader(ContentType::text());
 
   Ok((content_type, podcast_url))
 }
 
-async fn find_youtube_channel_id(channel_ref: ChannelRef) -> Result<String> {
+async fn find_youtube_channel_id(url: &str) -> Result<String> {
+  let channel_ref = extract_youtube_channel_ref(url)?;
+  find_youtube_channel_id_from_ref(channel_ref).await
+}
+
+async fn find_youtube_channel_id_from_ref(channel_ref: ChannelRef) -> Result<String> {
   let url = match channel_ref {
     ChannelRef::Name(name) => {
       format!("https://www.youtube.com/c/{name}")
@@ -111,6 +115,7 @@ async fn find_youtube_channel_id(channel_ref: ChannelRef) -> Result<String> {
 }
 
 enum ChannelRef {
+  // https://www.youtube.com/channel/UCZYTClx2T1of7BRZ86-8fow
   Id(String),
   // https://www.youtube.com/c/SciShow
   Name(String),
@@ -129,7 +134,7 @@ fn extract_youtube_channel_ref(url: &str) -> Result<ChannelRef> {
   let url: Url = url.parse()?;
 
   match url.host_str() {
-    Some("www.youtube.com") | Some("m.youtube.com") => (),
+    Some("www.youtube.com") | Some("m.youtube.com") | Some("youtube.com") => (),
     _ => return Err(Error::UnsupportedURL(url.into(), "not youtube domain")),
   }
 
