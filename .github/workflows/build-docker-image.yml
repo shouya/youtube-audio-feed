@@ -1,0 +1,52 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-unknown-linux-musl
+        components: rust-src
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Install build tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools podman
+
+    - name: Login to GitHub Container Registry
+      uses: redhat-actions/podman-login@v1
+      with:
+        registry: ghcr.io/${{ github.repository_owner }}
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Set image version
+      id: version
+      run: |
+        # Use short SHA for non-release builds
+        echo "version=v${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+        echo "Using version: ${{ steps.version.outputs.version }}"
+
+    - name: Build and push Docker image
+      run: |
+        make push-docker IMAGE_NAME=$IMAGE_NAME VERSION=$VERSION
+      env:
+        CARGO_TERM_COLOR: always
+        IMAGE_NAME: ghcr.io/${{ github.repository }}
+        VERSION: ${{ steps.version.outputs.version }}
