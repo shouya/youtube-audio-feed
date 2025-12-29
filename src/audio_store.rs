@@ -1,4 +1,5 @@
 use std::{
+  future::Future,
   path::{Path, PathBuf},
   sync::Arc,
   time::Instant,
@@ -6,16 +7,23 @@ use std::{
 
 use kameo::{actor::ActorRef, messages, Actor};
 use lru_time_cache::LruCache;
-use tokio::fs::File;
+use tokio::{fs::File, sync::Mutex};
+use tracing::warn;
 
 use crate::{Error, Result};
 
+pub enum AudioFileState {
+  New,
+  Ready,
+}
+
 pub struct AudioFile {
-  id: String,
-  path: PathBuf,
-  temp_path: PathBuf,
+  pub id: String,
+  pub path: PathBuf,
+  pub temp_path: PathBuf,
+  pub state: Mutex<AudioFileState>,
   #[allow(dead_code)]
-  created_at: Instant,
+  pub created_at: Instant,
 }
 
 impl Drop for AudioFile {
@@ -49,15 +57,15 @@ impl AudioStore {
   async fn get_or_allocate(
     &mut self,
     audio_id: String,
-  ) -> Result<(Arc<AudioFile>, bool)> {
+  ) -> Result<Arc<AudioFile>> {
     if let Some(file) = self.files.get(&audio_id) {
-      return Ok((file.clone(), false));
+      return Ok(file.clone());
     }
 
     let file = AudioFile::new(&self.base_dir, &audio_id);
     let value = Arc::new(file);
     self.files.insert(audio_id, value.clone());
-    Ok((value, true))
+    Ok(value)
   }
 
   #[message]
@@ -94,11 +102,11 @@ impl AudioStoreRef {
   pub async fn get_or_allocate(
     &self,
     audio_id: String,
-  ) -> Result<(Arc<AudioFile>, bool)> {
+  ) -> Result<Arc<AudioFile>> {
     Ok(self.0.ask(GetOrAllocate { audio_id }).send().await.unwrap())
   }
 
-  pub async fn remove(&self, audio_id: String) -> Result<()> {
+  pub async fn remove(&self, audio_id: &str) -> Result<()> {
     let audio_id = audio_id.to_string();
     self.0.ask(Remove { audio_id }).send().await.unwrap();
     Ok(())
@@ -113,6 +121,7 @@ impl AudioFile {
       id: audio_id.to_string(),
       path: file_path,
       temp_path,
+      state: Mutex::new(AudioFileState::New),
       created_at: Instant::now(),
     }
   }
@@ -121,19 +130,25 @@ impl AudioFile {
     File::open(&self.path).await.map_err(Error::IO)
   }
 
-  pub fn id(&self) -> &str {
-    &self.id
-  }
+  pub async fn get_or_download<F, Fut>(&self, dl: F) -> Result<File>
+  where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<()>>,
+  {
+    let mut guard = self.state.lock().await;
+    if let AudioFileState::Ready = &*guard {
+      return self.open().await;
+    };
 
-  pub fn ready(&self) -> bool {
-    self.path.exists()
-  }
 
-  pub fn path(&self) -> &Path {
-    &self.path
-  }
+    dl().await?;
 
-  pub fn temp_path(&self) -> &Path {
-    &self.temp_path
+    if !self.path.exists() {
+      warn!("audio file not found after download: {}", self.path.display());
+      return Err(Error::AudioStream(self.id.clone()));
+    }
+
+    *guard = AudioFileState::Ready;
+    self.open().await
   }
 }

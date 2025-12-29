@@ -2,6 +2,7 @@ use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
 use regex::Regex;
+use tokio::fs::File;
 use tokio::process::Command;
 use tracing::warn;
 
@@ -26,47 +27,31 @@ impl YtdlpFile {
 #[async_trait]
 impl Extractor for YtdlpFile {
   async fn extract(&self, video_id: &str) -> Result<Extraction> {
-    let (audio_file, is_new) = self
+    let audio_file = self
       .audio_store
       .get_or_allocate(video_id.to_string())
       .await?;
 
-    if is_new {
-      if let Err(e) = download_file(&audio_file).await {
-        self.audio_store.remove(video_id.to_string()).await?;
-        warn!("failed to download audio for {}: {}", video_id, e);
-        return Err(e);
+    match audio_file
+      .get_or_download(|| async { download_file(&audio_file).await })
+      .await
+    {
+      Ok(file) => serve_file(file).await,
+      Err(e) => {
+        warn!("error getting audio file {}: {}", video_id, e);
+
+        // delete errored file
+        drop(audio_file);
+        self.audio_store.remove(video_id).await.unwrap();
+        Err(e)
       }
     }
-
-    if !wait_for_file(&audio_file).await {
-      self.audio_store.remove(video_id.to_string()).await?;
-      warn!("audio file not ready for {}", video_id);
-      return Err(Error::AudioStream("file not found".to_string()));
-    }
-
-    serve_file(&audio_file).await
   }
-}
-
-async fn wait_for_file(audio_file: &AudioFile) -> bool {
-  let max_wait_time = std::time::Duration::from_secs(10);
-  let start = std::time::Instant::now();
-
-  while !audio_file.ready() {
-    if start.elapsed() > max_wait_time {
-      return false;
-    }
-
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-  }
-
-  true
 }
 
 async fn download_file(audio_file: &AudioFile) -> Result<()> {
-  let audio_id = audio_file.id();
-  let temp_path = audio_file.temp_path();
+  let audio_id = &audio_file.id;
+  let temp_path = &audio_file.temp_path;
   let url = format!("https://youtube.com/watch?v={audio_id}");
   eprintln!("downloading audio file: {}", url);
 
@@ -98,13 +83,12 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
   drop(guard);
   detect_error(&output.stderr)?;
 
-  std::fs::rename(temp_path, audio_file.path()).map_err(Error::IO)?;
+  std::fs::rename(temp_path, &audio_file.path).map_err(Error::IO)?;
 
   Ok(())
 }
 
-async fn serve_file(audio_file: &AudioFile) -> Result<Extraction> {
-  let file = audio_file.open().await?;
+async fn serve_file(file: File) -> Result<Extraction> {
   let mime_type = "audio/mp4".to_string();
   Ok(Extraction::File { file, mime_type })
 }
