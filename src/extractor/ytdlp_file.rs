@@ -3,9 +3,10 @@ use std::sync::{Arc, LazyLock};
 use async_trait::async_trait;
 use regex::Regex;
 use tokio::process::Command;
+use tracing::warn;
 
 use crate::audio_store::{AudioFile, AudioStoreRef};
-use crate::util::ytdlp_proxy;
+use crate::util::YTDLP_PROXY;
 use crate::{Error, Result, YTDLP_MUTEX};
 
 use super::{Extraction, Extractor};
@@ -25,20 +26,22 @@ impl YtdlpFile {
 #[async_trait]
 impl Extractor for YtdlpFile {
   async fn extract(&self, video_id: &str) -> Result<Extraction> {
-    let (audio_file, new) = self
+    let (audio_file, is_new) = self
       .audio_store
       .get_or_allocate(video_id.to_string())
       .await?;
 
-    if new {
+    if is_new {
       if let Err(e) = download_file(&audio_file).await {
         self.audio_store.remove(video_id.to_string()).await?;
+        warn!("failed to download audio for {}: {}", video_id, e);
         return Err(e);
       }
     }
 
     if !wait_for_file(&audio_file).await {
       self.audio_store.remove(video_id.to_string()).await?;
+      warn!("audio file not ready for {}", video_id);
       return Err(Error::AudioStream("file not found".to_string()));
     }
 
@@ -78,7 +81,7 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
     .arg("--no-mtime")
     .arg(url);
 
-  if let Some(proxy) = ytdlp_proxy() {
+  if let Some(proxy) = &*YTDLP_PROXY {
     // used to remove cred info from proxy url before printing
     static AUTH_REGEX: LazyLock<Regex> =
       LazyLock::new(|| Regex::new(r"//[^:]+(:[^@]+)@").unwrap());

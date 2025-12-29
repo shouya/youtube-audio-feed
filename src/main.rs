@@ -27,7 +27,8 @@ pub use util::YTDLP_MUTEX;
 use crate::audio_store::AudioStore;
 
 pub static INSTANCE_PUBLIC_URL: LazyLock<String> = LazyLock::new(|| {
-  std::env::var("INSTANCE_PUBLIC_URL").expect("INSTANCE_PUBLIC_URL not set")
+  std::env::var("INSTANCE_PUBLIC_URL")
+    .unwrap_or_else(|_| "http://localhost:8080".to_owned())
 });
 
 pub static GENERATOR_STR: LazyLock<String> = LazyLock::new(|| {

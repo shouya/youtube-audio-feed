@@ -50,8 +50,7 @@ impl AudioStore {
     &mut self,
     audio_id: String,
   ) -> Result<(Arc<AudioFile>, bool)> {
-    if let (Some(file), evicted) = self.files.notify_get(&audio_id) {
-      drop(evicted);
+    if let Some(file) = self.files.get(&audio_id) {
       return Ok((file.clone(), false));
     }
 
