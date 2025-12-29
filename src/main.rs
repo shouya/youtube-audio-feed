@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+  net::SocketAddr,
+  sync::{Arc, LazyLock},
+};
 
 use axum::{
   headers::ContentType, response::IntoResponse, routing::get, Extension,
@@ -22,13 +25,26 @@ pub use util::W;
 
 use crate::audio_store::AudioStore;
 
-#[cfg(not(debug_assertions))]
-pub const INSTANCE_PUBLIC_URL: &str = "https://youtube-audio-feed.fly.dev";
+pub static INSTANCE_PUBLIC_URL: LazyLock<String> = LazyLock::new(|| {
+  std::env::var("INSTANCE_PUBLIC_URL").expect("INSTANCE_PUBLIC_URL not set")
+});
 
-#[cfg(debug_assertions)]
-pub const INSTANCE_PUBLIC_URL: &str = "http://192.168.86.40:8080";
+pub static GENERATOR_STR: LazyLock<String> = LazyLock::new(|| {
+  std::env::var("GENERATOR_STR").unwrap_or_else(|_| {
+    "https://github.com/shouya/youtube_audio_feed".to_owned()
+  })
+});
 
-pub const GENERATOR_STR: &str = "https://github.com/shouya/youtube_audio_feed";
+pub static AUDIO_STORE_PATH: LazyLock<String> = LazyLock::new(|| {
+  std::env::var("AUDIO_STORE_PATH")
+    .unwrap_or_else(|_| "/tmp/audio-store".to_owned())
+});
+
+pub static BIND_ADDRESS: LazyLock<SocketAddr> = LazyLock::new(|| {
+  std::env::var("BIND_ADDRESS")
+    .map(|addr| addr.parse().expect("Invalid BIND_ADDRESS"))
+    .unwrap_or_else(|_| SocketAddr::from(([0, 0, 0, 0], 8080)))
+});
 
 #[tokio::main(worker_threads = 4)]
 async fn main() -> Result<()> {
@@ -41,11 +57,7 @@ async fn main() -> Result<()> {
     });
   }
 
-  let audio_store = if cfg!(not(debug_assertions)) {
-    AudioStore::new("/data/audio-store/")
-  } else {
-    AudioStore::new("/tmp/audio-store/")
-  };
+  let audio_store = AudioStore::new(AUDIO_STORE_PATH.as_str());
   let audio_store_ref = audio_store.spawn();
 
   let app = Router::new()
@@ -56,11 +68,11 @@ async fn main() -> Result<()> {
     .route("/audio/:video_id", get(audio::get_audio))
     .layer(Extension(Arc::new(audio_store_ref)));
 
-  info!("Listening on {}", INSTANCE_PUBLIC_URL);
+  info!("Listening on {}", INSTANCE_PUBLIC_URL.as_str());
 
   tokio::task::spawn(async move { piped::PipedInstanceRepo::run().await });
 
-  axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
+  axum::Server::bind(&BIND_ADDRESS)
     .serve(app.into_make_service())
     .await
     .expect("Failed to start server");

@@ -67,7 +67,7 @@ impl Harvestor for RssYtextract {
 
 fn make_episode(video: Video) -> Result<Episode> {
   let link = format!("https://www.youtube.com/watch?v={}", video.id());
-  let audio_link = format!("{INSTANCE_PUBLIC_URL}/audio/{}", video.id());
+  let audio_link = format!("{}/audio/{}", &*INSTANCE_PUBLIC_URL, video.id());
 
   let date = video
     .date()

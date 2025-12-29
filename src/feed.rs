@@ -63,7 +63,7 @@ pub async fn channel_podcast_url(
   Query(req): Query<GetPodcastReq>,
 ) -> Result<impl IntoResponse> {
   let channel_id = find_youtube_channel_id(&req.url).await?;
-  let podcast_url = format!("{INSTANCE_PUBLIC_URL}/channel/{channel_id}");
+  let podcast_url = format!("{}/channel/{channel_id}", &*INSTANCE_PUBLIC_URL);
   let content_type = TypedHeader(ContentType::text());
 
   Ok((content_type, podcast_url))

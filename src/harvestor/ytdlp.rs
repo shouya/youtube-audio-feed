@@ -123,7 +123,7 @@ impl From<Entry> for Episode {
       .into();
 
     let audio_info = AudioInfo {
-      url: format!("{}/audio/{}", INSTANCE_PUBLIC_URL, e.id),
+      url: format!("{}/audio/{}", &*INSTANCE_PUBLIC_URL, e.id),
       mime_type: "audio/mpeg".to_string(),
     };
     let pub_date = GLOBAL_EPISODE_DATE_REGISTRY.get(&e.id).to_rfc2822();

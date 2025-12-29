@@ -104,7 +104,7 @@ async fn make_episode(
 
   let video_url = W(&entry).link()?;
   let audio_info = AudioInfo {
-    url: format!("{}/audio/{}", INSTANCE_PUBLIC_URL, video_id),
+    url: format!("{}/audio/{}", &*INSTANCE_PUBLIC_URL, video_id),
     mime_type: "audio/mpeg".to_string(),
   };
 

@@ -35,7 +35,7 @@ impl From<Podcast> for rss::Channel {
       .last_build_date(Some(podcast.last_build_date))
       .language((!podcast.language.is_empty()).then_some(podcast.language))
       .itunes_ext(Some(itunes_ext))
-      .generator(Some(GENERATOR_STR.to_owned()))
+      .generator(Some(GENERATOR_STR.to_string()))
       .build();
 
     for episode in podcast.episodes {

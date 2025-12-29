@@ -155,5 +155,5 @@ fn translate_video_to_audio_url(uri_str: &str) -> Result<String> {
       Error::UnsupportedURL(uri_str.into(), "v parameter not found")
     })?;
 
-  Ok(format!("{INSTANCE_PUBLIC_URL}/audio/{video_id}"))
+  Ok(format!("{}/audio/{video_id}", &*INSTANCE_PUBLIC_URL))
 }
