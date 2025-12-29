@@ -95,7 +95,8 @@ pub struct PipedInstanceRepo {
 
 impl Default for PipedInstanceRepo {
   fn default() -> Self {
-    Self::new(Duration::from_secs(60 * 60))
+    // poll a new instance every 4 hours
+    Self::new(Duration::from_secs(240 * 60))
   }
 }
 
