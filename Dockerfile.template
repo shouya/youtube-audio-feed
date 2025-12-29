@@ -1,4 +1,5 @@
 FROM docker.io/library/alpine:edge AS RUNNER
 
 # py3-requests is required for HTTPS proxy support in yt-dlp
-RUN apk add --no-cache py3-requests yt-dlp
+# deno is the js runtime required by yt-dlp to extract youtube info
+RUN apk add --no-cache py3-requests deno yt-dlp
