@@ -8,7 +8,7 @@ use std::{
 use kameo::{actor::ActorRef, messages, Actor};
 use lru_time_cache::LruCache;
 use tokio::{fs::File, sync::Mutex};
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{Error, Result};
 
@@ -137,6 +137,7 @@ impl AudioFile {
   {
     let mut guard = self.state.lock().await;
     if let AudioFileState::Ready = &*guard {
+      info!("audio file already ready: {}", self.path.display());
       return self.open().await;
     };
 
@@ -148,6 +149,7 @@ impl AudioFile {
       return Err(Error::AudioStream(self.id.clone()));
     }
 
+    info!("audio file downloaded: {}", self.path.display());
     *guard = AudioFileState::Ready;
     self.open().await
   }
