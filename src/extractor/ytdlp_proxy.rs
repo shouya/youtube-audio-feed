@@ -8,6 +8,7 @@ use super::{Extraction, Extractor};
 
 // run yt-dlp command line to get audio playback url.
 // requires yt-dlp executable to be in PATH.
+#[allow(unused)]
 pub struct YtdlpProxy;
 
 #[async_trait]
@@ -45,7 +46,7 @@ impl Extractor for YtdlpProxy {
       .filter(|format| {
         format.resolution == "audio only" && format.audio_ext == "m4a"
       })
-      .max_by_key(|format| (format.quality.unwrap_or(0.0) as i64))
+      .max_by_key(|format| format.quality.unwrap_or(0.0) as i64)
       .ok_or_else(|| Error::Extraction)?;
 
     let url = format.url.clone();
