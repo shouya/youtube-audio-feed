@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 
-use crate::{Error, Result};
+use crate::{Error, Result, YTDLP_MUTEX};
 
 use super::{Extraction, Extractor};
 
@@ -34,7 +34,9 @@ impl Extractor for YtdlpProxy {
     }
 
     let url = format!("https://youtube.com/watch?v={video_id}");
+    let guard = YTDLP_MUTEX.acquire().await;
     let output = Command::new("yt-dlp").arg("-j").arg(url).output().await?;
+    drop(guard);
     let output =
       String::from_utf8(output.stdout).map_err(|_| Error::Extraction)?;
     let output: YtdlpOutput =

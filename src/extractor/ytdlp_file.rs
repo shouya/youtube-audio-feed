@@ -6,7 +6,7 @@ use tokio::process::Command;
 
 use crate::audio_store::{AudioFile, AudioStoreRef};
 use crate::util::ytdlp_proxy;
-use crate::{Error, Result};
+use crate::{Error, Result, YTDLP_MUTEX};
 
 use super::{Extraction, Extractor};
 
@@ -89,9 +89,10 @@ async fn download_file(audio_file: &AudioFile) -> Result<()> {
     cmd.arg("--proxy").arg(proxy);
   }
 
+  let guard = YTDLP_MUTEX.acquire().await.unwrap();
   let child = cmd.stderr(std::process::Stdio::piped()).spawn()?;
-
   let output = child.wait_with_output().await?;
+  drop(guard);
   detect_error(&output.stderr)?;
 
   std::fs::rename(temp_path, audio_file.path()).map_err(Error::IO)?;

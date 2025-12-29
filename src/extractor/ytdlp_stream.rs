@@ -5,7 +5,7 @@ use tokio::io::{AsyncWriteExt as _, BufReader};
 use tokio::process::Command;
 use tokio_util::io::ReaderStream;
 
-use crate::{Error, Result};
+use crate::{Error, Result, YTDLP_MUTEX};
 
 use super::{Extraction, Extractor};
 
@@ -64,6 +64,7 @@ async fn get_info_json(url: &str) -> Result<String> {
 async fn stream(info_json: &str) -> Result<Extraction> {
   let info: InfoJson = serde_json::from_str(info_json)?;
 
+  let guard = YTDLP_MUTEX.acquire().await;
   let mut child = Command::new("yt-dlp")
     .arg("--load-info-json")
     .arg("-")
@@ -91,7 +92,10 @@ async fn stream(info_json: &str) -> Result<Extraction> {
   let stream = futures::stream::select(stdout_stream, stderr_stream).boxed();
 
   // wait for child to finish in another task
-  tokio::spawn(async move { child.wait().await.unwrap() });
+  tokio::spawn(async move {
+    child.wait().await.unwrap();
+    drop(guard);
+  });
 
   let mime_type = String::from("audio/mp4");
   let filesize = info.filesize;

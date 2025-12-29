@@ -6,9 +6,19 @@ mod byte_stream;
 mod feed_ext;
 
 pub use byte_stream::ByteStream;
+use tokio::sync::Semaphore;
 
 #[derive(Default)]
 pub struct W<T>(pub T);
+
+// ensure only a limited set of ytdlp processes at a time
+pub static YTDLP_MUTEX: LazyLock<Semaphore> = LazyLock::new(|| {
+  let concurrency = std::env::var("YTDLP_CONCURRENCY")
+    .ok()
+    .and_then(|s| s.parse::<usize>().ok())
+    .unwrap_or(1);
+  Semaphore::new(concurrency)
+});
 
 // Races multiple futures concurrently and returns the first future that resolves to an `Ok` result,
 // while preserving the order of the input futures.

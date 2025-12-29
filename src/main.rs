@@ -22,6 +22,7 @@ mod util;
 pub use error::{Error, Result};
 use tracing::info;
 pub use util::W;
+pub use util::YTDLP_MUTEX;
 
 use crate::audio_store::AudioStore;
 
@@ -68,7 +69,8 @@ async fn main() -> Result<()> {
     .route("/audio/:video_id", get(audio::get_audio))
     .layer(Extension(Arc::new(audio_store_ref)));
 
-  info!("Listening on {}", INSTANCE_PUBLIC_URL.as_str());
+  info!("Listening on {}", *BIND_ADDRESS);
+  info!("Public URL: {}", &*INSTANCE_PUBLIC_URL);
 
   tokio::task::spawn(async move { piped::PipedInstanceRepo::run().await });
 

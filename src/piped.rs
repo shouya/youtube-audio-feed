@@ -165,7 +165,7 @@ impl PipedInstanceRepo {
       if let Some(instance) = instances.into_iter().next() {
         let mut global = this.current_instance.lock().unwrap();
         *global = instance.instance;
-        info!("Selected new piped instance: {:?}", *global);
+        info!("Selected new piped instance: {}", &global.api_url);
       };
 
       tokio::select! {

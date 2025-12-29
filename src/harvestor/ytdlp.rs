@@ -2,11 +2,11 @@ use std::sync::{Arc, LazyLock, RwLock};
 
 use crate::{
   podcast::{AudioInfo, Episode, Podcast},
-  Result, INSTANCE_PUBLIC_URL,
+  Result, INSTANCE_PUBLIC_URL, YTDLP_MUTEX,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use tokio::{process::Command, sync::Semaphore};
+use tokio::{process::Command};
 
 use super::Harvestor;
 
@@ -71,16 +71,6 @@ struct Thumbnail {
   #[serde(default)]
   height: i32,
 }
-
-// ensure only a limited set of ytdlp processes at a time
-static YTDLP_MUTEX: LazyLock<Semaphore> =
-  LazyLock::new(|| {
-    let concurrency = std::env::var("YTDLP_CONCURRENCY")
-      .ok()
-      .and_then(|s| s.parse::<usize>().ok())
-      .unwrap_or(1);
-    Semaphore::new(concurrency)
-  });
 
 #[async_trait]
 impl Harvestor for Ytdlp {
