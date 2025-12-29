@@ -19,6 +19,12 @@ swap_size_mb = 512
   source = "youtube_audio_feed_stash"
   destination = "/data"
 
+[env]
+  RUST_LOG = "info"
+  YTDLP_CONCURRENCY = "1"
+  INSTANCE_PUBLIC_URL = "https://youtube-audio-feed.fly.dev"
+  AUDIO_STORE_PATH = "/data/audio-store"
+
 [[services]]
   protocol = "tcp"
   internal_port = 8080
