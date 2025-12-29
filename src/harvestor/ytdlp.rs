@@ -6,7 +6,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use tokio::process::Command;
+use tokio::{process::Command, sync::Semaphore};
 
 use super::Harvestor;
 
@@ -72,6 +72,16 @@ struct Thumbnail {
   height: i32,
 }
 
+// ensure only a limited set of ytdlp processes at a time
+static YTDLP_MUTEX: LazyLock<Semaphore> =
+  LazyLock::new(|| {
+    let concurrency = std::env::var("YTDLP_CONCURRENCY")
+      .ok()
+      .and_then(|s| s.parse::<usize>().ok())
+      .unwrap_or(1);
+    Semaphore::new(concurrency)
+  });
+
 #[async_trait]
 impl Harvestor for Ytdlp {
   async fn harvest(&self, channel_id: &str) -> Result<Podcast> {
@@ -86,7 +96,11 @@ impl Harvestor for Ytdlp {
       .arg("--playlist-end")
       .arg("20")
       .arg(url);
+
+    let guard = YTDLP_MUTEX.acquire().await.unwrap();
     let stdout = cmd.output().await?.stdout;
+    drop(guard);
+
     let channel: Channel = serde_json::from_slice(&stdout)?;
 
     Ok(channel.into())
