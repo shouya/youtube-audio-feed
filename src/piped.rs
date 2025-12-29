@@ -13,6 +13,7 @@ use tokio::{
   sync::mpsc::{channel, Receiver, Sender},
   task::JoinSet,
 };
+use tracing::{info, warn};
 
 const DEFAULT_PIPED_INSTANCE: &str = "https://pipedapi.leptons.xyz";
 
@@ -111,7 +112,7 @@ impl PipedInstanceRepo {
 
   pub fn notify_update<E: std::error::Error>(e: E) -> E {
     eprintln!("Failed requesting piped: {e:?}, refreshing");
-    GLOBAL_REPO.update_signal.try_send(()).unwrap();
+    GLOBAL_REPO.update_signal.try_send(()).ok();
     e
   }
 
@@ -141,18 +142,29 @@ impl PipedInstanceRepo {
       .unwrap();
 
     loop {
-      let instances = this.pull_latest().await;
+      let Ok(instances) = this.pull_latest().await else {
+        warn!(
+          "Failed pulling latest piped instances. Retrying after {:?}",
+          this.interval
+        );
+        tokio::time::sleep(this.interval).await;
+        continue;
+      };
       let instances = check_latency(&instances).await;
 
       if instances.is_empty() {
-        println!("No piped instance available.");
+        warn!(
+          "No available piped instances found. Retrying after {:?}",
+          this.interval
+        );
+        tokio::time::sleep(this.interval).await;
         continue;
       }
 
       if let Some(instance) = instances.into_iter().next() {
         let mut global = this.current_instance.lock().unwrap();
         *global = instance.instance;
-        println!("Global piped instance updated: {:?}", *global);
+        info!("Selected new piped instance: {:?}", *global);
       };
 
       tokio::select! {
@@ -162,13 +174,8 @@ impl PipedInstanceRepo {
     }
   }
 
-  async fn pull_latest(&self) -> Vec<PipedInstanceStat> {
-    let markdown = reqwest::get(&self.wiki_url)
-      .await
-      .unwrap()
-      .text()
-      .await
-      .unwrap();
+  async fn pull_latest(&self) -> anyhow::Result<Vec<PipedInstanceStat>> {
+    let markdown = reqwest::get(&self.wiki_url).await?.text().await?;
 
     let mut instances: Vec<PipedInstanceStat> = vec![];
     const START_MARKER: &str = "--- | --- | --- | ---";
@@ -208,7 +215,7 @@ impl PipedInstanceRepo {
 
     instances.shuffle(&mut rand::thread_rng());
 
-    instances
+    Ok(instances)
   }
 }
 
@@ -270,7 +277,7 @@ mod tests {
   async fn test_piped_instance_repo() {
     let repo = PipedInstanceRepo::global();
 
-    let instances = repo.pull_latest().await;
+    let instances = repo.pull_latest().await?;
     println!("{:#?}", &instances);
     assert!(!instances.is_empty());
   }
